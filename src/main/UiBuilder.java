@@ -12,26 +12,21 @@ import java.util.ArrayList;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
-import org.eclipse.swt.widgets.Button;
-import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
-import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.List;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
-import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
-import org.eclipse.wb.swt.SWTResourceManager;
 import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
@@ -43,31 +38,19 @@ public class UiBuilder {
 		Select, Place
 	}
 
-	///////////////////////////
-	// Begin auto-generated fields
-
-	protected Shell shell;
-	private Text customProperties;
-	private Text nameField;
-	private Text xField;
-	private Text yField;
-	private Text widthField;
-	private Text heightField;
-	private TabItem infoTab;
-	private TabItem propertiesTab;
-	private List objectList;
-	private MenuItem menuUndo;
-	private MenuItem menuRedo;
-
-	//////////////////////////////
-	// End auto-generated fields
-
 	private UndoStack stack;
 	private ArrayList<Rectangle> objects;
 	private Path currentFile;
 	private Menu menuBar;
 	private boolean hasUnsavedChanges;
 	private ToolType selectedTool;
+
+	///////////////////////////
+	// Begin auto-generated fields
+
+	protected Shell shlUibuilderUntitled;
+	private MenuItem menuUndo;
+	private MenuItem menuRedo;
 
 	public UiBuilder() {
 		stack = new UndoStack();
@@ -78,14 +61,10 @@ public class UiBuilder {
 	}
 
 	private void populateList() {
-		// TODO: Also repaint canvas
-
-		objectList.deselectAll();
 		var descriptions = new String[objects.size()];
 		for (int i = 0; i < descriptions.length; i++) {
 			descriptions[i] = objects.get(i).toString();
 		}
-		objectList.setItems(descriptions);
 	}
 
 	/**
@@ -108,9 +87,9 @@ public class UiBuilder {
 	public void open() {
 		Display display = Display.getDefault();
 		createContents();
-		shell.open();
-		shell.layout();
-		while (!shell.isDisposed()) {
+		shlUibuilderUntitled.open();
+		shlUibuilderUntitled.layout();
+		while (!shlUibuilderUntitled.isDisposed()) {
 			if (!display.readAndDispatch()) {
 				display.sleep();
 			}
@@ -121,13 +100,13 @@ public class UiBuilder {
 	 * Create contents of the window. (auto-generated)
 	 */
 	protected void createContents() {
-		shell = new Shell();
-		shell.setSize(942, 516);
-		shell.setText("SWT Application");
-		shell.setLayout(new FormLayout());
+		shlUibuilderUntitled = new Shell();
+		shlUibuilderUntitled.setSize(942, 516);
+		shlUibuilderUntitled.setText("UiBuilder - Untitled");
+		shlUibuilderUntitled.setLayout(new FormLayout());
 
-		menuBar = new Menu(shell, SWT.BAR);
-		shell.setMenuBar(menuBar);
+		menuBar = new Menu(shlUibuilderUntitled, SWT.BAR);
+		shlUibuilderUntitled.setMenuBar(menuBar);
 
 		MenuItem mntmNewSubmenu = new MenuItem(menuBar, SWT.CASCADE);
 		mntmNewSubmenu.setText("File");
@@ -176,15 +155,33 @@ public class UiBuilder {
 		MenuItem menuPlace = new MenuItem(menu_3, SWT.NONE);
 		menuPlace.setText("Place");
 
-		Canvas canvas = new Canvas(shell, SWT.NONE);
-		FormData fd_canvas = new FormData();
-		fd_canvas.bottom = new FormAttachment(100, -10);
-		fd_canvas.right = new FormAttachment(100, -273);
-		fd_canvas.left = new FormAttachment(0, 10);
-		canvas.setLayoutData(fd_canvas);
+		Composite canvasContainer = new Composite(shlUibuilderUntitled, SWT.NONE);
+		canvasContainer.setLayout(new FillLayout(SWT.HORIZONTAL));
+		FormData fd_canvasContainer = new FormData();
+		fd_canvasContainer.bottom = new FormAttachment(100, -10);
+		fd_canvasContainer.right = new FormAttachment(100, -273);
+		fd_canvasContainer.left = new FormAttachment(0, 10);
+		canvasContainer.setLayoutData(fd_canvasContainer);
 
-		ToolBar toolBar = new ToolBar(shell, SWT.FLAT | SWT.RIGHT);
-		fd_canvas.top = new FormAttachment(toolBar, 6);
+		TabFolder tabFolder = new TabFolder(shlUibuilderUntitled, SWT.NONE);
+		FormData fd_tabFolder = new FormData();
+		fd_tabFolder.bottom = new FormAttachment(100);
+		fd_tabFolder.right = new FormAttachment(100);
+		fd_tabFolder.left = new FormAttachment(canvasContainer, 6);
+		tabFolder.setLayoutData(fd_tabFolder);
+
+		ToolBar toolBar = new ToolBar(shlUibuilderUntitled, SWT.FLAT | SWT.RIGHT);
+		fd_tabFolder.top = new FormAttachment(toolBar, 0, SWT.TOP);
+
+		TabItem tbtmObjects = new TabItem(tabFolder, SWT.NONE);
+		tbtmObjects.setText("Objects");
+
+		TabItem tbtmInfo = new TabItem(tabFolder, SWT.NONE);
+		tbtmInfo.setText("Info");
+
+		TabItem tbtmProperties = new TabItem(tabFolder, SWT.NONE);
+		tbtmProperties.setText("Properties");
+		fd_canvasContainer.top = new FormAttachment(toolBar, 6);
 		FormData fd_toolBar = new FormData();
 		fd_toolBar.right = new FormAttachment(100, -273);
 		fd_toolBar.left = new FormAttachment(0, 10);
@@ -197,74 +194,13 @@ public class UiBuilder {
 		ToolItem toolbarPlace = new ToolItem(toolBar, SWT.NONE);
 		toolbarPlace.setText("Place");
 
-		TabFolder tabFolder = new TabFolder(shell, SWT.NONE);
-		FormData fd_tabFolder = new FormData();
-		fd_tabFolder.bottom = new FormAttachment(canvas, 0, SWT.BOTTOM);
-		fd_tabFolder.right = new FormAttachment(100, -10);
-		fd_tabFolder.top = new FormAttachment(toolBar, 0, SWT.TOP);
-		fd_tabFolder.left = new FormAttachment(canvas, 6);
-		tabFolder.setLayoutData(fd_tabFolder);
-
-		TabItem tbtmNewItem_1 = new TabItem(tabFolder, SWT.NONE);
-		tbtmNewItem_1.setText("Objects");
-
-		objectList = new List(tabFolder, SWT.BORDER | SWT.V_SCROLL);
-		tbtmNewItem_1.setControl(objectList);
-
-		infoTab = new TabItem(tabFolder, SWT.NONE);
-		infoTab.setText("Info");
-
-		Composite composite = new Composite(tabFolder, SWT.NONE);
-		infoTab.setControl(composite);
-
-		Label lblNewLabel = new Label(composite, SWT.NONE);
-		lblNewLabel.setBounds(10, 13, 55, 15);
-		lblNewLabel.setText("Name");
-
-		nameField = new Text(composite, SWT.BORDER);
-		nameField.setBounds(163, 10, 76, 21);
-
-		xField = new Text(composite, SWT.BORDER);
-		xField.setBounds(163, 37, 76, 21);
-
-		yField = new Text(composite, SWT.BORDER);
-		yField.setBounds(163, 64, 76, 21);
-
-		widthField = new Text(composite, SWT.BORDER);
-		widthField.setBounds(163, 91, 76, 21);
-
-		heightField = new Text(composite, SWT.BORDER);
-		heightField.setBounds(163, 118, 76, 21);
-
-		Label lblNewLabel_1 = new Label(composite, SWT.NONE);
-		lblNewLabel_1.setBounds(10, 40, 55, 15);
-		lblNewLabel_1.setText("x");
-
-		Label lblNewLabel_2 = new Label(composite, SWT.NONE);
-		lblNewLabel_2.setBounds(10, 67, 55, 15);
-		lblNewLabel_2.setText("y");
-
-		Label lblNewLabel_3 = new Label(composite, SWT.NONE);
-		lblNewLabel_3.setBounds(10, 94, 55, 15);
-		lblNewLabel_3.setText("width");
-
-		Label lblNewLabel_4 = new Label(composite, SWT.NONE);
-		lblNewLabel_4.setBounds(10, 121, 55, 15);
-		lblNewLabel_4.setText("height");
-
-		Button deleteButton = new Button(composite, SWT.NONE);
-		deleteButton.setBounds(10, 384, 75, 25);
-		deleteButton.setText("Delete");
-
-		propertiesTab = new TabItem(tabFolder, SWT.NONE);
-		propertiesTab.setText("Properties");
-
-		customProperties = new Text(tabFolder, SWT.BORDER | SWT.MULTI);
-		customProperties.setBackground(SWTResourceManager.getColor(SWT.COLOR_WHITE));
-		propertiesTab.setControl(customProperties);
-
 		/////////////////////////////////
 		// End autogenerated code
+
+		ObjectListTab objectTab = new ObjectListTab(tabFolder, SWT.NONE);
+		tbtmObjects.setControl(objectTab);
+
+		var preview = new Preview(canvasContainer);
 
 		menuNew.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onNew));
 		menuOpen.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onOpen));
@@ -278,13 +214,10 @@ public class UiBuilder {
 		menuSelect.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectTool));
 		menuPlace.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onPlaceTool));
 
-		deleteButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onDelete));
-
 		toolbarPlace.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectTool));
 		toolbarSelect.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectTool));
-
-		objectList.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectionChange));
 		populateList();
+
 	}
 
 	private void onDelete(SelectionEvent e) {
@@ -372,7 +305,7 @@ public class UiBuilder {
 		if (!continueWithoutSaving()) {
 			return;
 		}
-		shell.close();
+		shlUibuilderUntitled.close();
 	}
 
 	private void onUndo(SelectionEvent e) {
@@ -406,7 +339,7 @@ public class UiBuilder {
 	}
 
 	private FileDialog makeDialog(int type) {
-		var dialog = new FileDialog(shell, type);
+		var dialog = new FileDialog(shlUibuilderUntitled, type);
 		String wildcard;
 		if (SWT.getPlatform().startsWith("win")) {
 			wildcard = "*.*";
@@ -424,7 +357,7 @@ public class UiBuilder {
 
 	private boolean continueWithoutSaving() {
 		if (hasUnsavedChanges) {
-			var dialog = new MessageBox(shell, SWT.ICON_WARNING | SWT.YES | SWT.NO);
+			var dialog = new MessageBox(shlUibuilderUntitled, SWT.ICON_WARNING | SWT.YES | SWT.NO);
 			dialog.setMessage("You have unsaved changes. Continue without saving?");
 			return dialog.open() == SWT.YES;
 		} else {
@@ -441,9 +374,9 @@ public class UiBuilder {
 		}
 
 		if (currentFile == null) {
-			shell.setText("UiBuilder - " + unsavedIndicator + "Untitled");
+			shlUibuilderUntitled.setText("UiBuilder - " + unsavedIndicator + "Untitled");
 		} else {
-			shell.setText("UiBuilder - " + unsavedIndicator + currentFile.getFileName());
+			shlUibuilderUntitled.setText("UiBuilder - " + unsavedIndicator + currentFile.getFileName());
 		}
 	}
 
