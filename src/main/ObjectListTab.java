@@ -63,14 +63,15 @@ public class ObjectListTab extends Composite {
 		selectedRectangle = null;
 		treeListener = SelectionListener.widgetSelectedAdapter(this::forwardSelectionEvent);
 		tree.addSelectionListener(treeListener);
+		listeners = new ArrayList<>();
 	}
 
 	private void forwardSelectionEvent(SelectionEvent e) {
 		if (e.widget == null) {
 			forwardSelectionEvent((Rectangle) null);
 		} else {
-			int index = tree.indexOf((TreeItem) e.widget);
-			assert (index != -1);
+			int index = tree.indexOf((TreeItem) e.item);
+			assert (index != -1 && index < data.size());
 			forwardSelectionEvent(data.get(index));
 		}
 	}
@@ -89,6 +90,27 @@ public class ObjectListTab extends Composite {
 			this.data = data;
 		}
 		updateData();
+	}
+
+	/**
+	 * 
+	 * @param rect
+	 *            Null for deselection.
+	 */
+	public void setSelectedRectangle(Rectangle rect) {
+		if (rect == selectedRectangle) {
+			return;
+		}
+		selectedRectangle = rect;
+		if (rect == null) {
+			tree.deselectAll();
+		} else {
+			int rectIndex = data.indexOf(rect);
+			assert (rectIndex != -1);
+			var item = tree.getItem(rectIndex);
+			assert (item != null);
+			tree.select(item);
+		}
 	}
 
 	/**
@@ -113,7 +135,9 @@ public class ObjectListTab extends Composite {
 			// Try to preserve the selected object.
 			int newSelectionIndex = data.indexOf(selectedRectangle);
 			if (newSelectionIndex != -1) {
-				tree.select(tree.getItem(newSelectionIndex));
+				var item = tree.getItem(newSelectionIndex);
+				assert (item != null);
+				tree.select(item);
 				// No need to send a deselection event.
 			} else {
 				// Send a deselection event.
@@ -121,7 +145,7 @@ public class ObjectListTab extends Composite {
 			}
 		} else {
 			// Send a deselection event.
-			forwardSelectionEvent(new SelectionEvent(null));
+			forwardSelectionEvent((Rectangle) null);
 		}
 	}
 

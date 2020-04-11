@@ -10,5 +10,17 @@ public class Rectangle {
 	public double width;
 	public double height;
 
+	/**
+	 * Can be null.
+	 */
 	public HashMap<String, Object> properties;
+
+	public Rectangle(double x, double y, double width, double height) {
+		this.x = x;
+		this.y = y;
+		this.width = width;
+		this.height = height;
+		name = "";
+		properties = null;
+	}
 }
