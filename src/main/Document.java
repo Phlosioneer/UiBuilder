@@ -1,0 +1,343 @@
+package main;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import com.google.gson.Gson;
+import com.google.gson.TypeAdapter;
+import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+
+// All coordinates are in ratios. (0 <= coord <= 1)
+@JsonAdapter(Document.DocumentTypeAdapter.class)
+public class Document {
+
+	private ArrayList<Rectangle> rectangles;
+
+	private List<Rectangle> rectanglesView;
+	private int currentSelection;
+	private Path filepath;
+	private String filename;
+	private UndoStack undoStack;
+	private boolean hasUnsavedChanges;
+
+	// TODO: The temp resize dimensions should not be in Document.
+	private double tempX;
+	private double tempY;
+	private double tempWidth;
+	private double tempHeight;
+	private boolean isInResizeMode;
+	private ArrayList<TemporaryResizeListener> tempResizeListeners;
+
+	private ArrayList<ListChangeListener> changeListeners;
+	private ArrayList<SelectionListener> selectionListeners;
+	private int selectionListenersSemaphore;
+
+	private Document(ArrayList<Rectangle> rectangles) {
+		this.rectangles = rectangles;
+		rectanglesView = Collections.unmodifiableList(rectangles);
+		currentSelection = -1;
+		filepath = null;
+		filename = "Untitled";
+		undoStack = new UndoStack();
+		hasUnsavedChanges = false;
+
+		tempX = 0;
+		tempY = 0;
+		tempWidth = 0;
+		tempHeight = 0;
+		isInResizeMode = false;
+		tempResizeListeners = new ArrayList<>();
+
+		changeListeners = new ArrayList<>();
+		selectionListeners = new ArrayList<>();
+		selectionListenersSemaphore = 0;
+	}
+
+	/**
+	 * Creates a new, untitled document.
+	 */
+	public Document() {
+		this(new ArrayList<>());
+	}
+
+	public boolean hasUnsavedChanges() {
+		return hasUnsavedChanges;
+	}
+
+	/**
+	 * Call this when a document is saved.
+	 */
+	public void clearUnsavedChangesFlag() {
+		hasUnsavedChanges = false;
+	}
+
+	public void setFile(File file) {
+		setFile(file.toPath());
+	}
+
+	public void setFile(Path path) {
+		filepath = path;
+		filename = path.getFileName().toString();
+	}
+
+	public void setFileName(String name) {
+		assert (filepath == null);
+		filename = name;
+	}
+
+	public String getFileName() {
+		return filename;
+	}
+
+	public Path getFilePath() {
+		return filepath;
+	}
+
+	public List<Rectangle> getRectangles() {
+		return rectanglesView;
+	}
+
+	public void addRectangle(Rectangle rect) {
+		assert (rect != null);
+		assert (!rectangles.contains(rect));
+		rectangles.add(rect);
+		currentSelection = rectangles.size() - 1;
+		notifyChangeListeners();
+		notifySelectionListeners();
+	}
+
+	public void removeRectangle(Rectangle rectangle) {
+		if (rectangles.remove(rectangle)) {
+			notifyChangeListeners();
+		}
+	}
+
+	public void setSelectedRectangle(int index) {
+		assert (index >= 0);
+		currentSelection = index;
+		notifySelectionListeners();
+	}
+
+	public void setSelectedRectangle(Rectangle rectangle) {
+		if (rectangle == null) {
+			currentSelection = -1;
+		} else {
+			currentSelection = rectangles.indexOf(rectangle);
+			assert (currentSelection != -1);
+		}
+		notifySelectionListeners();
+	}
+
+	public Rectangle getSelectedRectangle() {
+		if (currentSelection == -1) {
+			return null;
+		} else {
+			return rectangles.get(currentSelection);
+		}
+	}
+
+	public int getSelectedIndex() {
+		return currentSelection;
+	}
+
+	public void setTempSize(double x, double y, double width, double height) {
+		tempX = x;
+		tempY = y;
+		tempWidth = width;
+		tempHeight = height;
+		var listeners = new ArrayList<>(tempResizeListeners);
+		if (!isInResizeMode) {
+			assert (currentSelection != -1);
+			isInResizeMode = true;
+
+			for (var listener : listeners) {
+				listener.resizeStarted();
+			}
+		}
+
+		for (var listener : listeners) {
+			listener.resize(x, y, width, height);
+		}
+	}
+
+	public void cancelTempSize() {
+		tempX = 0;
+		tempY = 0;
+		tempWidth = 0;
+		tempHeight = 0;
+
+		var listeners = new ArrayList<>(tempResizeListeners);
+		for (var listener : listeners) {
+			listener.resizeCancelled();
+		}
+	}
+
+	/**
+	 * This method should be called whenever a rectangle's fields are modified.
+	 */
+	public void rectangleChanged(Rectangle rectangle) {
+		notifyChangeListeners();
+		if (rectangle == getSelectedRectangle()) {
+			notifySelectionListeners();
+		}
+	}
+
+	public void setPosition(Rectangle original, int newIndex) {
+		assert (newIndex >= 0 && newIndex < rectangles.size());
+		var oldIndex = rectangles.indexOf(original);
+		assert (oldIndex != -1);
+		if (oldIndex == newIndex) {
+			return;
+		}
+
+		var oldSelection = getSelectedRectangle();
+
+		rectangles.remove(oldIndex);
+		rectangles.add(newIndex, original);
+
+		setSelectedRectangle(oldSelection);
+	}
+
+	public double getTempX() {
+		return tempX;
+	}
+
+	public double getTempY() {
+		return tempY;
+	}
+
+	public double getTempWidth() {
+		return tempWidth;
+	}
+
+	public double getTempHeight() {
+		return tempHeight;
+	}
+
+	public UndoStack getUndoStack() {
+		return undoStack;
+	}
+
+	private void notifyChangeListeners() {
+		var listeners = new ArrayList<>(changeListeners);
+		for (var listener : listeners) {
+			listener.changed();
+		}
+	}
+
+	private void notifySelectionListeners() {
+		var listeners = new ArrayList<>(selectionListeners);
+		Rectangle selected = null;
+		if (currentSelection != -1) {
+			selected = rectangles.get(currentSelection);
+		}
+
+		// This cancels any other notifySelectionListeners() currently running.
+		selectionListenersSemaphore += 1;
+		var semaphoreId = selectionListenersSemaphore;
+
+		for (var listener : listeners) {
+			if (selectionListenersSemaphore != semaphoreId) {
+				break;
+			}
+			listener.selected(selected, currentSelection);
+		}
+	}
+
+	/**
+	 * 
+	 * @return The listener, for easy usage with lambdas.
+	 */
+	public ListChangeListener addListChangeListener(ListChangeListener listener) {
+		changeListeners.add(listener);
+		return listener;
+	}
+
+	public void removeListChangeListener(ListChangeListener listener) {
+		changeListeners.remove(listener);
+	}
+
+	/**
+	 * 
+	 * @return The listener, for easy usage with lambdas.
+	 */
+	public SelectionListener addSelectionListener(SelectionListener listener) {
+		selectionListeners.add(listener);
+		return listener;
+	}
+
+	public void removeSelectionListener(SelectionListener listener) {
+		selectionListeners.remove(listener);
+	}
+
+	/**
+	 * 
+	 * @return The listener, for easy usage with lambdas.
+	 */
+	public TemporaryResizeListener addTemporaryResizeListener(TemporaryResizeListener listener) {
+		tempResizeListeners.add(listener);
+		return listener;
+	}
+
+	public void removeTemporaryResizeListener(TemporaryResizeListener listener) {
+		tempResizeListeners.remove(listener);
+	}
+
+	public static interface ListChangeListener {
+		void changed();
+	}
+
+	public static interface SelectionListener {
+		/**
+		 * This will also fire if a selected rectangle is modified.
+		 * 
+		 * @param rect
+		 *            Null for deselection
+		 * @param index
+		 *            -1 for deselection
+		 */
+		void selected(Rectangle rect, int index);
+	}
+
+	public static interface TemporaryResizeListener {
+		void resizeStarted();
+
+		void resize(double x, double y, double width, double height);
+
+		void resizeCancelled();
+	}
+
+	public static class DocumentTypeAdapter extends TypeAdapter<Document> {
+		@Override
+		public void write(JsonWriter out, Document value) throws IOException {
+			out.beginObject();
+			out.name("rectangles");
+			var gson = new Gson();
+			var token = new TypeToken<ArrayList<Rectangle>>() {};
+			gson.toJson(value.rectangles, token.getType(), out);
+			out.endObject();
+		}
+
+		@Override
+		public Document read(JsonReader in) throws IOException {
+			in.beginObject();
+			ArrayList<Rectangle> rectangles = null;
+			var gson = new Gson();
+			var token = new TypeToken<ArrayList<Rectangle>>() {};
+			while (in.hasNext()) {
+				String name = in.nextName();
+				if (name.equalsIgnoreCase("rectangle")) {
+					rectangles = gson.fromJson(in, token.getType());
+				}
+			}
+			assert (rectangles != null);
+			return new Document(rectangles);
+		}
+	}
+}
