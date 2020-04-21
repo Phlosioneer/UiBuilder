@@ -13,6 +13,7 @@ import org.eclipse.swt.widgets.TreeItem;
 import main.Document.ListChangeListener;
 
 public class ObjectListTab extends Composite {
+	private Document attachedDocument;
 	private Document.SelectionListener selectionListener;
 	private ListChangeListener changeListener;
 
@@ -60,14 +61,22 @@ public class ObjectListTab extends Composite {
 
 		tree.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::forwardSelectionEvent));
 
-		var file = DocumentManager.getCurrentDocument();
-		selectionListener = file.addSelectionListener(this::rectSelected);
-		changeListener = file.addListChangeListener(this::populate);
-		DocumentManager.addSelectionListener((oldFile, newFile)-> {
-			oldFile.removeListChangeListener(changeListener);
-			oldFile.removeSelectionListener(selectionListener);
-			newFile.addListChangeListener(changeListener);
-			newFile.addSelectionListener(selectionListener);
+		// Note: Technically, this is a memory leak of ObjectListTab. If this object is removed from the view,
+		// it will still be reachable through these lambdas to DocumentManager's static variables.
+		//
+		// We (currently) don't need to allocate more than one, though, so the memory leak never matters.
+		changeListener = this::populate;
+		selectionListener = this::rectSelected;
+		attachedDocument = DocumentManager.getCurrentDocument();
+		attachedDocument.addSelectionListener(selectionListener);
+		attachedDocument.addListChangeListener(changeListener);
+		DocumentManager.addSelectionListener(document-> {
+			attachedDocument.removeSelectionListener(selectionListener);
+			attachedDocument.removeListChangeListener(changeListener);
+			attachedDocument = document;
+			document.addSelectionListener(selectionListener);
+			document.addListChangeListener(changeListener);
+			populate();
 		});
 	}
 

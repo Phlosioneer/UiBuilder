@@ -45,7 +45,7 @@ public class UiBuilder {
 		selectedTool = ToolType.Select;
 
 		// TODO: Event for undo/redo actions
-		DocumentManager.addSelectionListener((oldFile, newFile)-> {
+		DocumentManager.addSelectionListener(_document-> {
 			updateSavedIndicators();
 		});
 	}
@@ -201,6 +201,8 @@ public class UiBuilder {
 		menuPlace.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onPlaceTool));
 
 		createTab(DocumentManager.getCurrentDocument());
+
+		DocumentManager.setShouldCloseDocument(this::closeWithoutSaving);
 	}
 
 	// TODO: Create new tabs whenever a document is created.
@@ -214,7 +216,7 @@ public class UiBuilder {
 	}
 
 	private void onNew(SelectionEvent e) {
-		createTab(DocumentManager.newDocument());
+		DocumentManager.newDocument();
 	}
 
 	private void onOpen(SelectionEvent e) {
@@ -243,31 +245,17 @@ public class UiBuilder {
 	}
 
 	private void onExit(SelectionEvent e) {
-		if (!continueWithoutSaving()) {
-			return;
+		if (DocumentManager.closeAllDocuments()) {
+			shlUibuilderUntitled.close();
 		}
-		shlUibuilderUntitled.close();
 	}
 
 	private void onClose(SelectionEvent e) {
-		if (!continueWithoutSaving()) {
-			return;
-		}
-		var openDocuments = DocumentManager.getDocuments();
-		var currentDocument = DocumentManager.getCurrentDocument();
-		if (openDocuments.size() == 1) {
-			var newDocument = DocumentManager.newDocument();
-			DocumentManager.setCurrentFile(newDocument);
-		} else if (openDocuments.get(0) != currentDocument) {
-			DocumentManager.setCurrentFile(openDocuments.get(0));
-		} else {
-			DocumentManager.setCurrentFile(openDocuments.get(1));
-		}
-		DocumentManager.closeDocument(currentDocument);
+		DocumentManager.closeDocument(DocumentManager.getCurrentDocument());
 	}
 
 	private void onCloseAll(SelectionEvent e) {
-		// TODO: Implement this
+		DocumentManager.closeAllDocuments();
 	}
 
 	private void onUndo(SelectionEvent e) {
@@ -306,8 +294,12 @@ public class UiBuilder {
 		return dialog;
 	}
 
-	private boolean continueWithoutSaving() {
-		if (DocumentManager.getCurrentDocument().hasUnsavedChanges()) {
+	private boolean closeWithoutSaving(Document document) {
+		if (document.hasUnsavedChanges()) {
+			// Select the document first.
+			DocumentManager.setCurrentDocument(document);
+
+			// Prompt the user to confirm.
 			var dialog = new MessageBox(shlUibuilderUntitled, SWT.ICON_WARNING | SWT.YES | SWT.NO);
 			dialog.setMessage("You have unsaved changes. Continue without saving?");
 			return dialog.open() == SWT.YES;
