@@ -32,7 +32,8 @@ public class UiBuilder {
 
 	private Menu menuBar;
 	private ToolType selectedTool;
-	private HashMap<Document, TabItem> tabs;
+	private HashMap<Document, TabItem> documentsToTabs;
+	private HashMap<TabItem, Document> tabsToDocuments;
 
 	///////////////////////////
 	// Begin auto-generated fields
@@ -45,7 +46,8 @@ public class UiBuilder {
 
 	public UiBuilder() {
 		selectedTool = ToolType.Select;
-		tabs = new HashMap<>();
+		documentsToTabs = new HashMap<>();
+		tabsToDocuments = new HashMap<>();
 	}
 
 	/**
@@ -208,6 +210,10 @@ public class UiBuilder {
 
 		// Setup the first tab.
 		createTab(DocumentManager.getCurrentDocument());
+
+		// Keep the tab folder and the document manager in sync.
+		documentTabs.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onTabSelected));
+		DocumentManager.addSelectionListener(this::onDocumentSelected);
 	}
 
 	private void createTab(Document document) {
@@ -219,13 +225,29 @@ public class UiBuilder {
 		Preview preview = new Preview(documentTabs, document);
 		tab.setControl(preview);
 
-		tabs.put(document, tab);
+		documentsToTabs.put(document, tab);
+		tabsToDocuments.put(tab, document);
 	}
 
 	private void destroyTab(Document document) {
-		var tab = tabs.get(document);
+		var tab = documentsToTabs.get(document);
 		assert (tab != null);
 		tab.dispose();
+		documentsToTabs.remove(document);
+		tabsToDocuments.remove(tab);
+	}
+
+	private void onTabSelected(SelectionEvent e) {
+		var tab = (TabFolder) e.widget;
+		var document = tabsToDocuments.get(tab.getSelection()[0]);
+		assert (document != null);
+		DocumentManager.setCurrentDocument(document);
+	}
+
+	private void onDocumentSelected(Document document) {
+		var tab = documentsToTabs.get(document);
+		assert (tab != null);
+		documentTabs.setSelection(tab);
 	}
 
 	private void onNew(SelectionEvent e) {
@@ -325,7 +347,7 @@ public class UiBuilder {
 		} else {
 			unsavedIndicator = "";
 		}
-		var tab = tabs.get(document);
+		var tab = documentsToTabs.get(document);
 		assert (tab != null);
 		tab.setText(unsavedIndicator + document.getFileName());
 	}
