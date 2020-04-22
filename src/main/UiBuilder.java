@@ -2,6 +2,7 @@
 package main;
 
 import java.io.File;
+import java.util.HashMap;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -31,6 +32,7 @@ public class UiBuilder {
 
 	private Menu menuBar;
 	private ToolType selectedTool;
+	private HashMap<Document, TabItem> tabs;
 
 	///////////////////////////
 	// Begin auto-generated fields
@@ -43,11 +45,7 @@ public class UiBuilder {
 
 	public UiBuilder() {
 		selectedTool = ToolType.Select;
-
-		// TODO: Event for undo/redo actions
-		DocumentManager.addSelectionListener(_document-> {
-			updateSavedIndicators();
-		});
+		tabs = new HashMap<>();
 	}
 
 	/**
@@ -123,9 +121,11 @@ public class UiBuilder {
 
 		menuUndo = new MenuItem(menu_2, SWT.NONE);
 		menuUndo.setText("Undo");
+		menuUndo.setAccelerator(SWT.CONTROL | 'Z');
 
 		menuRedo = new MenuItem(menu_2, SWT.NONE);
 		menuRedo.setText("Redo");
+		menuRedo.setAccelerator(SWT.CONTROL | SWT.SHIFT | 'Z');
 
 		MenuItem mntmTools = new MenuItem(menuBar, SWT.CASCADE);
 		mntmTools.setText("Tools");
@@ -200,19 +200,32 @@ public class UiBuilder {
 		menuSelect.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectTool));
 		menuPlace.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onPlaceTool));
 
-		createTab(DocumentManager.getCurrentDocument());
-
 		DocumentManager.setShouldCloseDocument(this::closeWithoutSaving);
+
+		// Create a new tab whenever a document is created.
+		DocumentManager.addCreationListener(this::createTab);
+		DocumentManager.addCloseListener(this::destroyTab);
+
+		// Setup the first tab.
+		createTab(DocumentManager.getCurrentDocument());
 	}
 
-	// TODO: Create new tabs whenever a document is created.
 	private void createTab(Document document) {
-		TabItem tbtmUntitled = new TabItem(documentTabs, SWT.NONE);
-		tbtmUntitled.setText(document.getFileName());
+		assert (document != null);
+		TabItem tab = new TabItem(documentTabs, SWT.NONE);
+		tab.setText(document.getFileName());
+		document.addListChangeListener(()->updateSavedIndicators(document));
 
 		Preview preview = new Preview(documentTabs, document);
-		tbtmUntitled.setControl(preview);
-		preview.setLayout(new FormLayout());
+		tab.setControl(preview);
+
+		tabs.put(document, tab);
+	}
+
+	private void destroyTab(Document document) {
+		var tab = tabs.get(document);
+		assert (tab != null);
+		tab.dispose();
 	}
 
 	private void onNew(SelectionEvent e) {
@@ -232,7 +245,6 @@ public class UiBuilder {
 			onSaveAs(e);
 		}
 		DocumentManager.saveDocument(DocumentManager.getCurrentDocument());
-		updateSavedIndicators();
 	}
 
 	private void onSaveAs(SelectionEvent e) {
@@ -260,12 +272,10 @@ public class UiBuilder {
 
 	private void onUndo(SelectionEvent e) {
 		DocumentManager.getCurrentDocument().getUndoStack().undo();
-		updateSavedIndicators();
 	}
 
 	private void onRedo(SelectionEvent e) {
 		DocumentManager.getCurrentDocument().getUndoStack().redo();
-		updateSavedIndicators();
 	}
 
 	private void onSelectTool(SelectionEvent e) {
@@ -308,19 +318,21 @@ public class UiBuilder {
 		}
 	}
 
-	private void updateSavedIndicators() {
-		var currentFile = DocumentManager.getCurrentDocument();
-
+	private void updateSavedIndicators(Document document) {
 		String unsavedIndicator;
-		if (currentFile.hasUnsavedChanges()) {
+		if (document.hasUnsavedChanges()) {
 			unsavedIndicator = "*";
 		} else {
 			unsavedIndicator = "";
 		}
+		var tab = tabs.get(document);
+		assert (tab != null);
+		tab.setText(unsavedIndicator + document.getFileName());
+	}
 
-		shlUibuilderUntitled.setText("UiBuilder - " + unsavedIndicator + currentFile.getFileName());
-
-		menuUndo.setEnabled(currentFile.getUndoStack().canUndo());
-		menuRedo.setEnabled(currentFile.getUndoStack().canRedo());
+	private void updateUndoMenus() {
+		var document = DocumentManager.getCurrentDocument();
+		menuUndo.setEnabled(document.getUndoStack().canUndo());
+		menuRedo.setEnabled(document.getUndoStack().canRedo());
 	}
 }

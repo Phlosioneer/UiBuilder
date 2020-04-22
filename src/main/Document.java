@@ -12,6 +12,7 @@ import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import actions.CreateRectangle;
 
 // All coordinates are in ratios. (0 <= coord <= 1)
 @JsonAdapter(Document.DocumentTypeAdapter.class)
@@ -44,7 +45,7 @@ public class Document {
 		currentSelection = -1;
 		filepath = null;
 		filename = "Untitled";
-		undoStack = new UndoStack();
+		undoStack = new UndoStack(new UndoActionView(this));
 		hasUnsavedChanges = false;
 
 		tempX = 0;
@@ -104,16 +105,40 @@ public class Document {
 	}
 
 	public void addRectangle(Rectangle rect) {
-		assert (rect != null);
-		assert (!rectangles.contains(rect));
-		rectangles.add(rect);
-		currentSelection = rectangles.size() - 1;
-		notifyChangeListeners();
-		notifySelectionListeners();
+		addRectangle(rect, true);
 	}
 
-	public void removeRectangle(Rectangle rectangle) {
-		if (rectangles.remove(rectangle)) {
+	private void addRectangle(Rectangle rect, boolean makeUndoAction) {
+		assert (rect != null);
+		assert (!rectangles.contains(rect));
+		if (makeUndoAction) {
+			var action = new CreateRectangle(rect, true);
+			undoStack.push(action);
+		} else {
+			rectangles.add(rect);
+			currentSelection = rectangles.size() - 1;
+			notifyChangeListeners();
+			notifySelectionListeners();
+		}
+	}
+
+	public void removeRectangle(Rectangle rect) {
+		removeRectangle(rect, true);
+	}
+
+	private void removeRectangle(Rectangle rect, boolean makeUndoAction) {
+		assert (rect != null);
+		assert (rectangles.contains(rect));
+		if (makeUndoAction) {
+			var action = new CreateRectangle(rect, false);
+			undoStack.push(action);
+		} else {
+			var index = rectangles.indexOf(rect);
+			if (currentSelection == index) {
+				currentSelection = -1;
+				notifySelectionListeners();
+			}
+			rectangles.remove(rect);
 			notifyChangeListeners();
 		}
 	}
@@ -338,6 +363,30 @@ public class Document {
 			}
 			assert (rectangles != null);
 			return new Document(rectangles);
+		}
+	}
+
+	/**
+	 * This class provides an interface with a Document that doesn't trigger undo actions.
+	 * It's provided to UndoActions to avoid recursive undo action creation.
+	 */
+	public static class UndoActionView {
+		private Document parent;
+
+		public UndoActionView(Document parent) {
+			this.parent = parent;
+		}
+
+		public Document getParent() {
+			return parent;
+		}
+
+		public void addRectangle(Rectangle rectangle) {
+			parent.addRectangle(rectangle, false);
+		}
+
+		public void removeRectangle(Rectangle rectangle) {
+			parent.removeRectangle(rectangle, false);
 		}
 	}
 }

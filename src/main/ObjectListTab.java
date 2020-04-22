@@ -61,22 +61,24 @@ public class ObjectListTab extends Composite {
 
 		tree.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::forwardSelectionEvent));
 
-		// Note: Technically, this is a memory leak of ObjectListTab. If this object is removed from the view,
-		// it will still be reachable through these lambdas to DocumentManager's static variables.
-		//
-		// We (currently) don't need to allocate more than one, though, so the memory leak never matters.
 		changeListener = this::populate;
 		selectionListener = this::rectSelected;
 		attachedDocument = DocumentManager.getCurrentDocument();
 		attachedDocument.addSelectionListener(selectionListener);
 		attachedDocument.addListChangeListener(changeListener);
-		DocumentManager.addSelectionListener(document-> {
+		var listener = DocumentManager.addSelectionListener(document-> {
 			attachedDocument.removeSelectionListener(selectionListener);
 			attachedDocument.removeListChangeListener(changeListener);
 			attachedDocument = document;
 			document.addSelectionListener(selectionListener);
 			document.addListChangeListener(changeListener);
 			populate();
+		});
+		// Clean up listeners.
+		addDisposeListener(event-> {
+			DocumentManager.removeSelectionListener(listener);
+			attachedDocument.removeSelectionListener(selectionListener);
+			attachedDocument.removeListChangeListener(changeListener);
 		});
 	}
 

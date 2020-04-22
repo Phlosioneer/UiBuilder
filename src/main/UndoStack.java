@@ -1,15 +1,19 @@
 package main;
 
 import java.util.ArrayList;
+import actions.UndoAction;
+import main.Document.UndoActionView;
 
 public class UndoStack {
 
-	private ArrayList<Action> actions;
+	private ArrayList<UndoAction> actions;
 	private int cursor;
+	private UndoActionView view;
 
-	public UndoStack() {
+	public UndoStack(UndoActionView view) {
 		actions = new ArrayList<>();
-		cursor = 0;
+		cursor = -1;
+		this.view = view;
 	}
 
 	public boolean canUndo() {
@@ -28,7 +32,7 @@ public class UndoStack {
 		cursor -= 1;
 
 		// Do the action last, so that UndoStack is in a valid state while it runs.
-		action.undoAction();
+		action.undoAction(view);
 	}
 
 	public void redo() {
@@ -36,20 +40,20 @@ public class UndoStack {
 			throw new RuntimeException("No actions to redo");
 		}
 		cursor += 1;
-		actions.get(cursor).doAction();
+		actions.get(cursor).doAction(view);
 	}
 
-	public void push(Action action) {
+	public void push(UndoAction action) {
 		// Truncate list to cursor position.
-		while (cursor < actions.size()) {
+		while (cursor < actions.size() - 1) {
 			actions.remove(actions.size() - 1);
 		}
 
-		actions.add(action);
 		cursor += 1;
+		actions.add(action);
 
 		// Do the action last, so that UndoStack is in a valid state while it runs.
-		action.doAction();
+		action.doAction(view);
 	}
 
 	/**
