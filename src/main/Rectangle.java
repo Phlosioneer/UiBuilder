@@ -15,6 +15,13 @@ public class Rectangle {
 	 */
 	public HashMap<String, Object> properties;
 
+	/**
+	 * Used by Gson
+	 */
+	public Rectangle() {
+		this(0, 0, 0, 0);
+	}
+
 	public Rectangle(double x, double y, double width, double height) {
 		this.x = x;
 		this.y = y;

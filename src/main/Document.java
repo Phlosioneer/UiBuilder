@@ -357,10 +357,13 @@ public class Document {
 			var token = new TypeToken<ArrayList<Rectangle>>() {};
 			while (in.hasNext()) {
 				String name = in.nextName();
-				if (name.equalsIgnoreCase("rectangle")) {
+				if (name.equalsIgnoreCase("rectangles")) {
 					rectangles = gson.fromJson(in, token.getType());
+				} else {
+					in.skipValue();
 				}
 			}
+			in.endObject();
 			assert (rectangles != null);
 			return new Document(rectangles);
 		}

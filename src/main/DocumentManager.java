@@ -112,7 +112,7 @@ public class DocumentManager {
 	public static void openDocument(File file) {
 		for (var document : instance.files) {
 			try {
-				if (Files.isSameFile(document.getFilePath(), file.toPath())) {
+				if (document.getFilePath() != null && Files.isSameFile(document.getFilePath(), file.toPath())) {
 					// Select that file instead of opening a new copy.
 					setCurrentDocument(document);
 				}
