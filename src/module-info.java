@@ -1,7 +1,7 @@
 module main {
 	requires transitive org.eclipse.swt.win32.win32.x86_64;
 	requires java.desktop;
-	requires gson;
+	requires transitive gson;
 
 	// Gson depends on java.sql.
 	requires java.sql;
