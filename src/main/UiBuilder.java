@@ -169,6 +169,9 @@ public class UiBuilder {
 		TabItem tbtmInfo = new TabItem(tabFolder, SWT.NONE);
 		tbtmInfo.setText("Info");
 
+		ObjectInfoTab infoTab = new ObjectInfoTab(tabFolder);
+		tbtmInfo.setControl(infoTab);
+
 		TabItem tbtmProperties = new TabItem(tabFolder, SWT.NONE);
 		tbtmProperties.setText("Properties");
 
