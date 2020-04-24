@@ -99,7 +99,6 @@ public class ObjectListTab extends Composite {
 	 * Call this when the data array changes.
 	 */
 	public void populate() {
-		System.out.println("ObjectListTab populated");
 		var file = DocumentManager.getCurrentDocument();
 		var data = file.getRectangles();
 		String[] entries = new String[data.size()];
