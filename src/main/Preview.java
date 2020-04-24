@@ -24,8 +24,8 @@ public class Preview extends Canvas implements PaintListener, MouseListener, Mou
 		super(parent, SWT.NONE);
 		this.document = document;
 		assert (document != null);
-		document.addListChangeListener(this::redraw);
-		document.addSelectionListener((_rect, _index)->redraw());
+		document.getUndoStack().addListener(action->redraw());
+		document.addSelectionListener(rect->redraw());
 
 		addMouseListener(this);
 		addMouseMoveListener(this);

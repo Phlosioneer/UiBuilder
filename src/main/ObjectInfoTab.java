@@ -117,11 +117,17 @@ public class ObjectInfoTab extends Composite {
 		// End generated code
 
 		attachedDocument = DocumentManager.getCurrentDocument();
-		var selectionListener = attachedDocument.addSelectionListener((rect, index)->populate());
-		DocumentManager.addSelectionListener(newDocument-> {
+		var selectionListener = attachedDocument.addSelectionListener(rect->populate());
+		var documentListener = DocumentManager.addSelectionListener(newDocument-> {
 			attachedDocument.removeSelectionListener(selectionListener);
 			attachedDocument = newDocument;
 			newDocument.addSelectionListener(selectionListener);
+		});
+
+		// Clean up listeners.
+		addDisposeListener(e-> {
+			attachedDocument.removeSelectionListener(selectionListener);
+			DocumentManager.removeSelectionListener(documentListener);
 		});
 	}
 

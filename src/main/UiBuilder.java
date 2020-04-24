@@ -223,7 +223,7 @@ public class UiBuilder {
 		assert (document != null);
 		TabItem tab = new TabItem(documentTabs, SWT.NONE);
 		tab.setText(document.getFileName());
-		document.addListChangeListener(()->updateSavedIndicators(document));
+		document.getUndoStack().addListener(action->updateSavedIndicators(document));
 
 		Preview preview = new Preview(documentTabs, document);
 		tab.setControl(preview);

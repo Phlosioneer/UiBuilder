@@ -8,4 +8,7 @@ module main {
 
 	// Required for Gson's reflection framework.
 	exports main;
+
+	// Silence warning messages.
+	exports actions;
 }

@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import com.google.gson.Gson;
 import com.google.gson.TypeAdapter;
 import com.google.gson.annotations.JsonAdapter;
@@ -27,16 +28,14 @@ public class Document {
 	private UndoStack undoStack;
 	private boolean hasUnsavedChanges;
 
-	// TODO: The temp resize dimensions should not be in Document.
+	// TODO: Should the temp resize dimensions be in Document?
 	private double tempX;
 	private double tempY;
 	private double tempWidth;
 	private double tempHeight;
 	private boolean isInResizeMode;
 	private ArrayList<TemporaryResizeListener> tempResizeListeners;
-
-	private ArrayList<ListChangeListener> changeListeners;
-	private ArrayList<SelectionListener> selectionListeners;
+	private ArrayList<Consumer<Rectangle>> selectionListeners;
 	private int selectionListenersSemaphore;
 
 	private Document(ArrayList<Rectangle> rectangles) {
@@ -55,7 +54,6 @@ public class Document {
 		isInResizeMode = false;
 		tempResizeListeners = new ArrayList<>();
 
-		changeListeners = new ArrayList<>();
 		selectionListeners = new ArrayList<>();
 		selectionListenersSemaphore = 0;
 	}
@@ -114,11 +112,10 @@ public class Document {
 		if (makeUndoAction) {
 			var action = new CreateRectangle(rect, true);
 			undoStack.push(action);
+			notifySelectionListeners();
 		} else {
 			rectangles.add(rect);
 			currentSelection = rectangles.size() - 1;
-			notifyChangeListeners();
-			notifySelectionListeners();
 		}
 	}
 
@@ -139,7 +136,6 @@ public class Document {
 				notifySelectionListeners();
 			}
 			rectangles.remove(rect);
-			notifyChangeListeners();
 		}
 	}
 
@@ -203,16 +199,6 @@ public class Document {
 		}
 	}
 
-	/**
-	 * This method should be called whenever a rectangle's fields are modified.
-	 */
-	public void rectangleChanged(Rectangle rectangle) {
-		notifyChangeListeners();
-		if (rectangle == getSelectedRectangle()) {
-			notifySelectionListeners();
-		}
-	}
-
 	public void setPosition(Rectangle original, int newIndex) {
 		assert (newIndex >= 0 && newIndex < rectangles.size());
 		var oldIndex = rectangles.indexOf(original);
@@ -249,13 +235,6 @@ public class Document {
 		return undoStack;
 	}
 
-	private void notifyChangeListeners() {
-		var listeners = new ArrayList<>(changeListeners);
-		for (var listener : listeners) {
-			listener.changed();
-		}
-	}
-
 	private void notifySelectionListeners() {
 		var listeners = new ArrayList<>(selectionListeners);
 		Rectangle selected = null;
@@ -271,7 +250,7 @@ public class Document {
 			if (selectionListenersSemaphore != semaphoreId) {
 				break;
 			}
-			listener.selected(selected, currentSelection);
+			listener.accept(selected);
 		}
 	}
 
@@ -279,25 +258,12 @@ public class Document {
 	 * 
 	 * @return The listener, for easy usage with lambdas.
 	 */
-	public ListChangeListener addListChangeListener(ListChangeListener listener) {
-		changeListeners.add(listener);
-		return listener;
-	}
-
-	public void removeListChangeListener(ListChangeListener listener) {
-		changeListeners.remove(listener);
-	}
-
-	/**
-	 * 
-	 * @return The listener, for easy usage with lambdas.
-	 */
-	public SelectionListener addSelectionListener(SelectionListener listener) {
+	public Consumer<Rectangle> addSelectionListener(Consumer<Rectangle> listener) {
 		selectionListeners.add(listener);
 		return listener;
 	}
 
-	public void removeSelectionListener(SelectionListener listener) {
+	public void removeSelectionListener(Consumer<Rectangle> listener) {
 		selectionListeners.remove(listener);
 	}
 
@@ -312,22 +278,6 @@ public class Document {
 
 	public void removeTemporaryResizeListener(TemporaryResizeListener listener) {
 		tempResizeListeners.remove(listener);
-	}
-
-	public static interface ListChangeListener {
-		void changed();
-	}
-
-	public static interface SelectionListener {
-		/**
-		 * This will also fire if a selected rectangle is modified.
-		 * 
-		 * @param rect
-		 *            Null for deselection
-		 * @param index
-		 *            -1 for deselection
-		 */
-		void selected(Rectangle rect, int index);
 	}
 
 	public static interface TemporaryResizeListener {
