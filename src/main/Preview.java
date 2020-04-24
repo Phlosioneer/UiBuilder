@@ -18,20 +18,23 @@ public class Preview extends Canvas implements PaintListener, MouseListener, Mou
 	private int currentMouseY;
 	private boolean mouseIsDown;
 
-	private Document document;
-
 	public Preview(Composite parent, Document document) {
 		super(parent, SWT.NONE);
-		this.document = document;
 		assert (document != null);
-		document.getUndoStack().addListener(action->redraw());
-		document.addSelectionListener(rect->redraw());
+		var actionListener = document.getUndoStack().addListener(action->redraw());
+		var selectionListener = document.addSelectionListener(rect->redraw());
+
+		addDisposeListener(e-> {
+			document.getUndoStack().removeListener(actionListener);
+			document.removeSelectionListener(selectionListener);
+		});
 
 		addMouseListener(this);
 		addMouseMoveListener(this);
 		addPaintListener(this);
 
 		setBackground(new Color(getDisplay(), 255, 255, 255));
+
 	}
 
 	@Override
@@ -85,6 +88,11 @@ public class Preview extends Canvas implements PaintListener, MouseListener, Mou
 			double height = Math.abs(currentMouseY - mouseDownY) / (double) size.y;
 			double x = Math.min(currentMouseX, mouseDownX) / (double) size.x;
 			double y = Math.min(currentMouseY, mouseDownY) / (double) size.y;
+
+			width = Math.round(width * 1000) / 1000.0;
+			height = Math.round(height * 1000) / 1000.0;
+			x = Math.round(x * 1000) / 1000.0;
+			y = Math.round(y * 1000) / 1000.0;
 			DocumentManager.getCurrentDocument().addRectangle(new Rectangle(x, y, width, height));
 		}
 	}
