@@ -192,6 +192,7 @@ public class Document {
 		tempY = 0;
 		tempWidth = 0;
 		tempHeight = 0;
+		isInResizeMode = false;
 
 		var listeners = new ArrayList<>(tempResizeListeners);
 		for (var listener : listeners) {

@@ -13,6 +13,7 @@ import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
+import actions.ResizeRectangleAction;
 import main.Document.TemporaryResizeListener;
 import main.UiBuilder.ToolType;
 
@@ -32,7 +33,8 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	private int mouseDownY;
 	private int currentMouseX;
 	private int currentMouseY;
-	private boolean mouseIsDown;
+	private boolean makingNewRect;
+	private boolean resizingRect;
 	private ToolType currentTool;
 
 	private Document document;
@@ -58,11 +60,16 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	private ArrayList<Rectangle> allHandles;
 	private Cursor[] handleCursors;
 
+	private Rectangle heldHandle;
+
 	public Editor(TabFolder parent, Document document) {
 		assert (document != null);
 		this.document = document;
 		tab = new TabItem(parent, SWT.NONE);
 		tab.setData(TAB_ITEM_DATA_NAME, this);
+		makingNewRect = false;
+		resizingRect = false;
+		heldHandle = null;
 
 		tab.setText(document.getFileName());
 		document.getUndoStack().addListener(action->updateSavedIndicators());
@@ -96,6 +103,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 		BLACK = new Color(tab.getDisplay(), 0, 0, 0);
 		GRAY = new Color(tab.getDisplay(), 150, 150, 150);
 
+		// Setup the cursor icons for each handle.
 		handleNE = new Rectangle(-1, -1, 0, 0);
 		handleNW = new Rectangle(-1, -1, 0, 0);
 		handleSE = new Rectangle(-1, -1, 0, 0);
@@ -162,6 +170,12 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 				rectY = document.getTempY();
 				rectWidth = document.getTempWidth();
 				rectHeight = document.getTempHeight();
+
+				// The temp dimensions might not be normalized.
+				rectX = Math.min(rectX, rectX + rectWidth);
+				rectY = Math.min(rectY, rectY + rectHeight);
+				rectWidth = Math.abs(rectWidth);
+				rectHeight = Math.abs(rectHeight);
 			}
 			int scaledX = (int) Math.round(rectX * size.x);
 			int scaledY = (int) Math.round(rectY * size.y);
@@ -170,17 +184,16 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			context.drawRectangle(scaledX, scaledY, scaledWidth, scaledHeight);
 		}
 
-		if (mouseIsDown && currentTool == ToolType.Place) {
-			// drawRectangle handles negative width/height almost correctly; it's off by one pixel
-			// on negative lengths.
+		if (makingNewRect && currentTool == ToolType.Place) {
 			int width = currentMouseX - mouseDownX;
 			int height = currentMouseY - mouseDownY;
-			if (width < 0) {
-				width -= 1;
-			}
-			if (height < 0) {
-				height -= 1;
-			}
+
+			// Normalize the rectangle before drawing it.
+			int x = Math.min(currentMouseX, currentMouseX + width);
+			int y = Math.min(currentMouseY, currentMouseY + height);
+			width = Math.abs(width);
+			height = Math.abs(height);
+
 			context.drawRectangle(mouseDownX, mouseDownY, width, height);
 		}
 
@@ -200,9 +213,13 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 		}
 	}
 
+	/**
+	 * Updates all handle positions around the selected rectangle.
+	 */
 	private void updateHandles() {
 		var selected = document.getSelectedRectangle();
 		if (selected == null) {
+			// Move them all off-screen.
 			for (var handle : allHandles) {
 				handle.x = -1;
 				handle.y = -1;
@@ -213,6 +230,8 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 		}
 
 		var size = canvas.getSize();
+
+		// Check if a resize event is happening.
 		double rectX = selected.x;
 		double rectY = selected.y;
 		double rectWidth = selected.width;
@@ -222,12 +241,28 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			rectY = document.getTempY();
 			rectWidth = document.getTempWidth();
 			rectHeight = document.getTempHeight();
+
+			// Coordinates from temp resize might not be normalized.
+			rectX = Math.min(rectX, rectX + rectWidth);
+			rectY = Math.min(rectY, rectY + rectHeight);
+			rectWidth = Math.abs(rectWidth);
+			rectHeight = Math.abs(rectHeight);
 		}
+
+		// Convert to canvas coordinates.
 		int roundedX = (int) Math.round(rectX * size.x);
 		int roundedY = (int) Math.round(rectY * size.y);
 		int roundedWidth = (int) Math.round(rectWidth * size.x);
 		int roundedHeight = (int) Math.round(rectHeight * size.y);
 
+		// All handles have the same dimensions unless modified below.
+		for (var handle : allHandles) {
+			handle.width = HANDLE_SIZE;
+			handle.height = HANDLE_SIZE;
+		}
+
+		// Calculate positions for all visible handles. They're offset
+		// from the selected rectangle by HANDLE_SPACING pixels.
 		{
 			int x1 = roundedX - HANDLE_SPACING - HANDLE_SIZE;
 			int y1 = roundedY - HANDLE_SPACING - HANDLE_SIZE;
@@ -245,6 +280,9 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			visibleHandleSE.y = y2;
 		}
 
+		// Calculate the positions for all invisible handles. They're
+		// offset by halfo of HANDLE_SIZE so that they're evenly divided
+		// across the outline of the rectangle.
 		{
 			int x1 = roundedX - HANDLE_SIZE / 2;
 			int y1 = roundedY - HANDLE_SIZE / 2;
@@ -266,11 +304,9 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			handleS.y = y2;
 		}
 
-		for (var handle : allHandles) {
-			handle.width = HANDLE_SIZE;
-			handle.height = HANDLE_SIZE;
-		}
-
+		// Calculate the widths and heights for the side handles, and
+		// adjust their positions so that they don't overlap with the
+		// corner handles.
 		{
 			handleN.x = roundedX + HANDLE_SIZE / 2;
 			handleS.x = roundedX + HANDLE_SIZE / 2;
@@ -287,7 +323,8 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	@Override
 	public void mouseMove(MouseEvent event) {
 		var selected = document.getSelectedRectangle();
-		if (mouseIsDown) {
+		if (makingNewRect) {
+			// Determine which cursor to use.
 			int cursorType;
 			if (currentMouseX >= mouseDownX) {
 				if (currentMouseY >= mouseDownY) {
@@ -303,11 +340,27 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 				}
 			}
 			canvas.setCursor(canvas.getDisplay().getSystemCursor(cursorType));
+
+			// Save the current mouse position.
 			currentMouseX = event.x;
 			currentMouseY = event.y;
 			canvas.redraw();
+
+		} else if (resizingRect) {
+			// Save the current mouse position.
+			currentMouseX = event.x;
+			currentMouseY = event.y;
+
+			// Calculate the new resize coordinates.
+			updateTempResize();
+
+			// Don't change the cursor icon.
+			canvas.redraw();
+
 		} else if (selected != null) {
 			boolean cursorSet = false;
+
+			// If the mouse is over a handle, set the cursor to the corresponding icon.
 			for (int i = 0; i < allHandles.size(); i++) {
 				var handle = allHandles.get(i);
 				if (handle.contains(event.x, event.y)) {
@@ -317,17 +370,22 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 					break;
 				}
 			}
+
+			// If not over a handle, check if we're over the selected rectangle's interior.
 			var size = canvas.getSize();
 			if (!cursorSet && event.x >= selected.x * size.x && event.x < (selected.x + selected.width) * size.x) {
 				if (event.y >= selected.y * size.y && event.y < (selected.y + selected.height) * size.y) {
+					// This is the four-arrows "move" cursor.
 					canvas.setCursor(canvas.getDisplay().getSystemCursor(SWT.CURSOR_SIZEALL));
 					cursorSet = true;
 				}
 			}
 			if (!cursorSet) {
+				// Reset the cursor back to normal.
 				canvas.setCursor(canvas.getDisplay().getSystemCursor(SWT.CURSOR_ARROW));
 			}
 		} else {
+			// Reset the cursor back to normal.
 			canvas.setCursor(canvas.getDisplay().getSystemCursor(SWT.CURSOR_ARROW));
 		}
 	}
@@ -339,15 +397,39 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 
 	@Override
 	public void mouseDown(MouseEvent event) {
+		// Selection handles ignore the current tool.
+		var selected = document.getSelectedRectangle();
+		if (selected != null) {
+			for (var handle : allHandles) {
+				if (handle.contains(event.x, event.y)) {
+					resizingRect = true;
+					mouseDownX = event.x;
+					mouseDownY = event.y;
+					currentMouseX = event.x;
+					currentMouseY = event.y;
+					heldHandle = handle;
+
+					// Start a resize event.
+					document.setTempSize(selected.x, selected.y, selected.width, selected.height);
+
+					// Skip the logic for the current tool.
+					return;
+				}
+			}
+		}
+
 		switch (currentTool) {
 			case Place:
 				// Start a drag event.
-				mouseIsDown = true;
+				makingNewRect = true;
 				mouseDownX = event.x;
 				mouseDownY = event.y;
 				currentMouseX = mouseDownX;
 				currentMouseY = mouseDownY;
+				// Set a default cursor icon; this will be corrected to the actual appropriate
+				// icon whenever the user moves their mouse.
 				canvas.setCursor(canvas.getDisplay().getSystemCursor(SWT.CURSOR_SIZESE));
+				canvas.redraw();
 				break;
 			case Select:
 				// Find the rectangle under the mouse, and select it. If no rectagle is
@@ -366,26 +448,106 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 				}
 				break;
 		}
-		canvas.redraw();
 	}
 
 	@Override
 	public void mouseUp(MouseEvent event) {
 		canvas.setCursor(new Cursor(canvas.getDisplay(), SWT.CURSOR_ARROW));
-		if (mouseIsDown) {
-			mouseIsDown = false;
+		if (makingNewRect) {
+			makingNewRect = false;
 			var size = canvas.getSize();
+
+			// Convert to normalized ratio coordinates.
 			double width = Math.abs(currentMouseX - mouseDownX) / (double) size.x;
 			double height = Math.abs(currentMouseY - mouseDownY) / (double) size.y;
 			double x = Math.min(currentMouseX, mouseDownX) / (double) size.x;
 			double y = Math.min(currentMouseY, mouseDownY) / (double) size.y;
 
+			// Round to 3 decimal places.
 			width = Math.round(width * 1000) / 1000.0;
 			height = Math.round(height * 1000) / 1000.0;
 			x = Math.round(x * 1000) / 1000.0;
 			y = Math.round(y * 1000) / 1000.0;
+
 			DocumentManager.getCurrentDocument().addRectangle(new main.Rectangle(x, y, width, height));
+		} else if (resizingRect) {
+			// Let the resize function do most of the calculations for us.
+			updateTempResize();
+
+			// Get the sizes we calculated in updateTempResize.
+			double newX = document.getTempX();
+			double newY = document.getTempY();
+			double newWidth = document.getTempWidth();
+			double newHeight = document.getTempHeight();
+
+			// Normalize the rectangle.
+			newX = Math.min(newX, newX + newWidth);
+			newY = Math.min(newY, newY + newHeight);
+			newWidth = Math.abs(newWidth);
+			newHeight = Math.abs(newHeight);
+
+			// Round to 3 decimal places.
+			newX = Math.round(newX * 1000) / 1000.0;
+			newY = Math.round(newY * 1000) / 1000.0;
+			newWidth = Math.round(newWidth * 1000) / 1000.0;
+			newHeight = Math.round(newHeight * 1000) / 1000.0;
+
+			document.cancelTempSize();
+
+			var selected = document.getSelectedRectangle();
+			document.getUndoStack().push(new ResizeRectangleAction(selected, newX, newY, newWidth, newHeight));
+
+			resizingRect = false;
+			heldHandle = null;
 		}
+	}
+
+	private void updateTempResize() {
+		assert (heldHandle != null);
+		var size = canvas.getSize();
+		// General strategy: pick a corner to keep constant, then change width and height
+		// by the movement of the mouse.
+
+		// Get the distance the mouse has moved.
+		double deltaX = (currentMouseX - mouseDownX) / (double) size.x;
+		double deltaY = (currentMouseY - mouseDownY) / (double) size.y;
+
+		double x;
+		double y;
+		double width;
+		double height;
+
+		var rect = document.getSelectedRectangle();
+
+		if (heldHandle == handleNW || heldHandle == handleSW || heldHandle == handleW || heldHandle == visibleHandleNW || heldHandle == visibleHandleSW) {
+			// Northern handles and vertical edges: use one of the southern corners.
+			x = rect.x + rect.width;
+			width = -rect.width;
+		} else {
+			// Southern handles: use one of the northern corners.
+			x = rect.x;
+			width = rect.width;
+		}
+		if (heldHandle == handleNW || heldHandle == handleNE || heldHandle == handleN || heldHandle == visibleHandleNW || heldHandle == visibleHandleNE) {
+			// Western handles and horizontal edges: use one of the eastern corners.
+			y = rect.y + rect.height;
+			height = -rect.height;
+		} else {
+			// Eastern handles: use one of the western corners.
+			y = rect.y;
+			height = rect.height;
+		}
+
+		if (heldHandle != handleN && heldHandle != handleS) {
+			// Update the width unless we're holding a north/south handle.
+			width += deltaX;
+		}
+		if (heldHandle != handleW && heldHandle != handleE) {
+			// Update the height unless we're holding an east/west handle.
+			height += deltaY;
+		}
+
+		document.setTempSize(x, y, width, height);
 	}
 
 	public ToolType getCurrentTool() {
