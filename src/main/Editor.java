@@ -192,12 +192,12 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			int height = currentMouseY - mouseDownY;
 
 			// Normalize the rectangle before drawing it.
-			int x = Math.min(currentMouseX, currentMouseX + width);
-			int y = Math.min(currentMouseY, currentMouseY + height);
+			int x = Math.min(mouseDownX, mouseDownX + width);
+			int y = Math.min(mouseDownY, mouseDownY + height);
 			width = Math.abs(width);
 			height = Math.abs(height);
 
-			context.drawRectangle(mouseDownX, mouseDownY, width, height);
+			context.drawRectangle(x, y, width, height);
 		}
 
 		if (selected != null) {
