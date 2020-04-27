@@ -30,4 +30,23 @@ public class Rectangle {
 		name = "";
 		properties = null;
 	}
+
+	@Override
+	public String toString() {
+		if (name.isBlank()) {
+			var builder = new StringBuilder();
+			builder.append("(x:");
+			builder.append(Double.toString(x), 0, 5);
+			builder.append(", y:");
+			builder.append(Double.toString(y), 0, 5);
+			builder.append(", w:");
+			builder.append(Double.toString(width), 0, 5);
+			builder.append(", h:");
+			builder.append(Double.toString(height), 0, 5);
+			builder.append(')');
+			return builder.toString();
+		} else {
+			return name;
+		}
+	}
 }
