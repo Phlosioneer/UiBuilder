@@ -69,12 +69,51 @@ public class ObjectListTab extends Composite {
 			document.getUndoStack().addListener(changeListener);
 			populate();
 		});
+
+		buttonUp.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onButtonUp));
+		buttonDown.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onButtonDown));
+		delete.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onDelete));
+
+		buttonUp.setEnabled(false);
+		buttonDown.setEnabled(false);
+		delete.setEnabled(false);
+
 		// Clean up listeners.
 		addDisposeListener(event-> {
 			DocumentManager.removeSelectionListener(listener);
 			attachedDocument.removeSelectionListener(selectionListener);
 			attachedDocument.getUndoStack().removeListener(changeListener);
 		});
+	}
+
+	private void onButtonUp(SelectionEvent e) {
+		var document = DocumentManager.getCurrentDocument();
+		var index = document.getSelectedIndex();
+		assert (index != -1);
+		if (index > 0) {
+			document.setPosition(document.getSelectedRectangle(), index - 1);
+		}
+	}
+
+	private void onButtonDown(SelectionEvent e) {
+		var document = DocumentManager.getCurrentDocument();
+		var index = document.getSelectedIndex();
+		assert (index != -1);
+		if (index < document.getRectangles().size() - 1) {
+			document.setPosition(document.getSelectedRectangle(), index + 1);
+		}
+	}
+
+	private void onDelete(SelectionEvent e) {
+		var document = DocumentManager.getCurrentDocument();
+		var rect = document.getSelectedRectangle();
+		assert (rect != null);
+		var index = document.getSelectedIndex();
+		document.removeRectangle(rect);
+
+		// Select a new rectangle.
+		index = Math.min(index, document.getRectangles().size() - 1);
+		document.setSelectedRectangle(index);
 	}
 
 	private void forwardSelectionEvent(SelectionEvent e) {
@@ -89,9 +128,15 @@ public class ObjectListTab extends Composite {
 	private void rectSelected(Rectangle rect) {
 		if (rect == null) {
 			tree.deselectAll();
+			buttonUp.setEnabled(false);
+			buttonDown.setEnabled(false);
+			delete.setEnabled(false);
 		} else {
 			var index = attachedDocument.getSelectedIndex();
 			tree.select(tree.getItem(index));
+			buttonUp.setEnabled(index > 0);
+			buttonDown.setEnabled(index < attachedDocument.getRectangles().size() - 1);
+			delete.setEnabled(true);
 		}
 	}
 
