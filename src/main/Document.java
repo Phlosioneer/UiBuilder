@@ -56,6 +56,8 @@ public class Document {
 
 		selectionListeners = new ArrayList<>();
 		selectionListenersSemaphore = 0;
+
+		undoStack.addListener(action->hasUnsavedChanges = true);
 	}
 
 	/**

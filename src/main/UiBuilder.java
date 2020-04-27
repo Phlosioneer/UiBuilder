@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.events.ShellEvent;
+import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
@@ -91,6 +93,7 @@ public class UiBuilder {
 	 */
 	protected void createContents() {
 		shlUibuilderUntitled = new Shell();
+		shlUibuilderUntitled.addShellListener(ShellListener.shellClosedAdapter(this::onExit));
 		shlUibuilderUntitled.setMinimumSize(new Point(400, 400));
 		shlUibuilderUntitled.setSize(942, 516);
 		shlUibuilderUntitled.setText("UiBuilder");
@@ -348,6 +351,10 @@ public class UiBuilder {
 		}
 	}
 
+	private void onExit(ShellEvent e) {
+		e.doit = DocumentManager.closeAllDocuments();
+	}
+
 	private void onClose(SelectionEvent e) {
 		DocumentManager.closeDocument(DocumentManager.getCurrentDocument());
 	}
@@ -412,6 +419,7 @@ public class UiBuilder {
 			// Prompt the user to confirm.
 			var dialog = new MessageBox(shlUibuilderUntitled, SWT.ICON_WARNING | SWT.YES | SWT.NO);
 			dialog.setMessage("You have unsaved changes. Continue without saving?");
+			dialog.setText(shlUibuilderUntitled.getText());
 			return dialog.open() == SWT.YES;
 		} else {
 			return true;
