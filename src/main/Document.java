@@ -280,6 +280,10 @@ public class Document {
 		tempResizeListeners.remove(listener);
 	}
 
+	public boolean hasTempResize() {
+		return isInResizeMode;
+	}
+
 	public static interface TemporaryResizeListener {
 		void resizeStarted();
 

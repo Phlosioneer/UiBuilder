@@ -10,9 +10,10 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
+import main.Document.TemporaryResizeListener;
 import main.UiBuilder.ToolType;
 
-public class Editor implements PaintListener, MouseListener, MouseMoveListener {
+public class Editor implements PaintListener, MouseListener, MouseMoveListener, TemporaryResizeListener {
 
 	public static final String TAB_ITEM_DATA_NAME = "ParentEditor";
 
@@ -48,6 +49,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener {
 
 		var actionListener = document.getUndoStack().addListener(action->canvas.redraw());
 		var selectionListener = document.addSelectionListener(rect->canvas.redraw());
+		var tempResizeListener = document.addTemporaryResizeListener(this);
 		var saveListener = DocumentManager.addSaveListener(savedDoc-> {
 			if (savedDoc == document) {
 				updateSavedIndicators();
@@ -85,12 +87,23 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener {
 		context.setForeground(BLACK);
 		var file = DocumentManager.getCurrentDocument();
 		var size = canvas.getSize();
+		var selected = file.getSelectedRectangle();
 		for (var rect : file.getRectangles()) {
-			int x = (int) Math.round(rect.x * size.x);
-			int y = (int) Math.round(rect.y * size.y);
-			int width = (int) Math.round(rect.width * size.x);
-			int height = (int) Math.round(rect.height * size.y);
-			context.drawRectangle(x, y, width, height);
+			double rectX = rect.x;
+			double rectY = rect.y;
+			double rectWidth = rect.width;
+			double rectHeight = rect.height;
+			if (file.hasTempResize() && selected == rect) {
+				rectX = file.getTempX();
+				rectY = file.getTempY();
+				rectWidth = file.getTempWidth();
+				rectHeight = file.getTempHeight();
+			}
+			int scaledX = (int) Math.round(rectX * size.x);
+			int scaledY = (int) Math.round(rectY * size.y);
+			int scaledWidth = (int) Math.round(rectWidth * size.x);
+			int scaledHeight = (int) Math.round(rectHeight * size.y);
+			context.drawRectangle(scaledX, scaledY, scaledWidth, scaledHeight);
 		}
 
 		if (mouseIsDown && currentTool == ToolType.Place) {
@@ -107,12 +120,21 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener {
 			context.drawRectangle(mouseDownX, mouseDownY, width, height);
 		}
 
-		var selected = file.getSelectedRectangle();
 		if (selected != null) {
-			int x = (int) Math.round(selected.x * size.x);
-			int y = (int) Math.round(selected.y * size.y);
-			int x2 = x + (int) Math.round(selected.width * size.x);
-			int y2 = y + (int) Math.round(selected.height * size.y);
+			double rectX = selected.x;
+			double rectY = selected.y;
+			double rectWidth = selected.width;
+			double rectHeight = selected.height;
+			if (file.hasTempResize()) {
+				rectX = file.getTempX();
+				rectY = file.getTempY();
+				rectWidth = file.getTempWidth();
+				rectHeight = file.getTempHeight();
+			}
+			int x = (int) Math.round(rectX * size.x);
+			int y = (int) Math.round(rectY * size.y);
+			int x2 = x + (int) Math.round(rectWidth * size.x);
+			int y2 = y + (int) Math.round(rectHeight * size.y);
 			x -= HANDLE_SPACING;
 			y -= HANDLE_SPACING;
 			x2 += HANDLE_SPACING;
@@ -211,5 +233,18 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener {
 
 	public TabItem getTabItem() {
 		return tab;
+	}
+
+	@Override
+	public void resizeStarted() {}
+
+	@Override
+	public void resize(double x, double y, double width, double height) {
+		canvas.redraw();
+	}
+
+	@Override
+	public void resizeCancelled() {
+		canvas.redraw();
 	}
 }
