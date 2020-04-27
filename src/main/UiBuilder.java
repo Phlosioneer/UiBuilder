@@ -25,6 +25,7 @@ import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
+import org.eclipse.wb.swt.SWTResourceManager;
 
 public class UiBuilder {
 
@@ -65,6 +66,8 @@ public class UiBuilder {
 			window.open();
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			SWTResourceManager.dispose();
 		}
 	}
 
