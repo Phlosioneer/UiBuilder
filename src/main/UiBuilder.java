@@ -2,9 +2,7 @@
 package main;
 
 import java.io.File;
-import java.lang.ref.WeakReference;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -35,9 +33,7 @@ public class UiBuilder {
 
 	private Menu menuBar;
 	private ToolType selectedTool;
-	private HashMap<Document, TabItem> documentsToTabs;
-	private HashMap<TabItem, Document> tabsToDocuments;
-	private HashSet<WeakReference<Editor>> previews;
+	private ArrayList<Editor> editors;
 
 	///////////////////////////
 	// Begin auto-generated fields
@@ -50,9 +46,7 @@ public class UiBuilder {
 
 	public UiBuilder() {
 		selectedTool = ToolType.Place;
-		documentsToTabs = new HashMap<>();
-		tabsToDocuments = new HashMap<>();
-		previews = new HashSet<>();
+		editors = new ArrayList<>();
 	}
 
 	/**
@@ -232,42 +226,35 @@ public class UiBuilder {
 
 	private void createTab(Document document) {
 		assert (document != null);
-		TabItem tab = new TabItem(documentTabs, SWT.NONE);
-		tab.setText(document.getFileName());
-		document.getUndoStack().addListener(action->updateSavedIndicators(document));
-
-		Editor preview = new Editor(documentTabs, document);
-		tab.setControl(preview);
-		preview.setCurrentTool(selectedTool);
-
-		documentsToTabs.put(document, tab);
-		tabsToDocuments.put(tab, document);
-		previews.add(new WeakReference<>(preview));
+		Editor editor = new Editor(documentTabs, document);
+		editors.add(editor);
+		editor.setCurrentTool(selectedTool);
 	}
 
 	private void destroyTab(Document document) {
-		var tab = documentsToTabs.get(document);
-		assert (tab != null);
-		tab.dispose();
-		documentsToTabs.remove(document);
-		tabsToDocuments.remove(tab);
-
-		// This is unlikely to remove the tab we just destroyed, but should cleanup
-		// after previous destroyed tabs.
-		previews.removeIf(ref->ref.get() != null);
+		assert (document != null);
+		for (var tab : editors) {
+			if (tab.getDocument() == document) {
+				editors.remove(tab);
+				tab.dispose();
+			}
+		}
+		throw new RuntimeException("Unable to find an editor for document:" + document);
 	}
 
 	private void onTabSelected(SelectionEvent e) {
-		var tab = (TabFolder) e.widget;
-		var document = tabsToDocuments.get(tab.getSelection()[0]);
-		assert (document != null);
-		DocumentManager.setCurrentDocument(document);
+		assert (documentTabs.getSelection().length == 1);
+		var tab = documentTabs.getSelection()[0];
+		var editor = (Editor) tab.getData(Editor.TAB_ITEM_DATA_NAME);
+		DocumentManager.setCurrentDocument(editor.getDocument());
 	}
 
 	private void onDocumentSelected(Document document) {
-		var tab = documentsToTabs.get(document);
-		assert (tab != null);
-		documentTabs.setSelection(tab);
+		for (var editor : editors) {
+			if (editor.getDocument() == document) {
+				documentTabs.setSelection(editor.getTabItem());
+			}
+		}
 	}
 
 	private void onNew(SelectionEvent e) {
@@ -322,11 +309,8 @@ public class UiBuilder {
 
 	private void setSelectedTool(ToolType newToolType) {
 		selectedTool = newToolType;
-		for (var previewRef : previews) {
-			var preview = previewRef.get();
-			if (preview != null) {
-				preview.setCurrentTool(newToolType);
-			}
+		for (var editor : editors) {
+			editor.setCurrentTool(selectedTool);
 		}
 	}
 
@@ -360,18 +344,6 @@ public class UiBuilder {
 		} else {
 			return true;
 		}
-	}
-
-	private void updateSavedIndicators(Document document) {
-		String unsavedIndicator;
-		if (document.hasUnsavedChanges()) {
-			unsavedIndicator = "*";
-		} else {
-			unsavedIndicator = "";
-		}
-		var tab = documentsToTabs.get(document);
-		assert (tab != null);
-		tab.setText(unsavedIndicator + document.getFileName());
 	}
 
 	private void updateUndoMenus() {

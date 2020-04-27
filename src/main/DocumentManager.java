@@ -29,6 +29,7 @@ public class DocumentManager {
 	private ArrayList<Consumer<Document>> selectionListeners;
 	private ArrayList<Consumer<Document>> creationListeners;
 	private ArrayList<Consumer<Document>> closeListeners;
+	private ArrayList<Consumer<Document>> saveListeners;
 	private Predicate<Document> shouldCloseDocument;
 
 	// We can't change the selected file while iterating through selectionListeners.
@@ -42,9 +43,9 @@ public class DocumentManager {
 		selectionListeners = new ArrayList<>();
 		creationListeners = new ArrayList<>();
 		closeListeners = new ArrayList<>();
+		saveListeners = new ArrayList<>();
 		shouldCloseDocument = null;
 
-		selectionListeners = new ArrayList<>();
 		currentFileLock = false;
 	}
 
@@ -216,7 +217,11 @@ public class DocumentManager {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			throw new RuntimeException("IOException handler not yet written in saveDocument of DocumentManager.", e);
+			// return;
 		}
+
+		// Saved successfully.
+		instance.notifySaveListeners(document);
 	}
 
 	public static Consumer<Document> addSelectionListener(Consumer<Document> listener) {
@@ -272,6 +277,22 @@ public class DocumentManager {
 
 	private void notifyCloseListeners(Document document) {
 		var listeners = new ArrayList<>(closeListeners);
+		for (var listener : listeners) {
+			listener.accept(document);
+		}
+	}
+
+	public static Consumer<Document> addSaveListener(Consumer<Document> listener) {
+		instance.saveListeners.add(listener);
+		return listener;
+	}
+
+	public static void removeSaveListener(Consumer<Document> listener) {
+		instance.saveListeners.remove(listener);
+	}
+
+	private void notifySaveListeners(Document document) {
+		var listeners = new ArrayList<>(instance.saveListeners);
 		for (var listener : listeners) {
 			listener.accept(document);
 		}

@@ -8,10 +8,13 @@ import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.widgets.Canvas;
-import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.widgets.TabItem;
 import main.UiBuilder.ToolType;
 
-public class Editor extends Canvas implements PaintListener, MouseListener, MouseMoveListener {
+public class Editor implements PaintListener, MouseListener, MouseMoveListener {
+
+	public static final String TAB_ITEM_DATA_NAME = "ParentEditor";
 
 	// In pixels.
 	private static final int HANDLE_SIZE = 8;
@@ -28,28 +31,52 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 	private ToolType currentTool;
 
 	private Document document;
+	private TabItem tab;
+	private Canvas canvas;
 
-	public Editor(Composite parent, Document document) {
-		super(parent, SWT.NONE);
+	public Editor(TabFolder parent, Document document) {
 		assert (document != null);
 		this.document = document;
-		var actionListener = document.getUndoStack().addListener(action->redraw());
-		var selectionListener = document.addSelectionListener(rect->redraw());
+		tab = new TabItem(parent, SWT.NONE);
+		tab.setData(TAB_ITEM_DATA_NAME, this);
 
-		addDisposeListener(e-> {
-			document.getUndoStack().removeListener(actionListener);
-			document.removeSelectionListener(selectionListener);
+		tab.setText(document.getFileName());
+		document.getUndoStack().addListener(action->updateSavedIndicators());
+
+		canvas = new Canvas(parent, SWT.NONE);
+		tab.setControl(canvas);
+
+		var actionListener = document.getUndoStack().addListener(action->canvas.redraw());
+		var selectionListener = document.addSelectionListener(rect->canvas.redraw());
+		var saveListener = DocumentManager.addSaveListener(savedDoc-> {
+			if (savedDoc == document) {
+				updateSavedIndicators();
+			}
 		});
 
-		addMouseListener(this);
-		addMouseMoveListener(this);
-		addPaintListener(this);
+		tab.addDisposeListener(e-> {
+			document.getUndoStack().removeListener(actionListener);
+			document.removeSelectionListener(selectionListener);
+			DocumentManager.removeSaveListener(saveListener);
+		});
 
-		setBackground(new Color(getDisplay(), 255, 255, 255));
+		canvas.addMouseListener(this);
+		canvas.addMouseMoveListener(this);
+		canvas.addPaintListener(this);
+
+		canvas.setBackground(new Color(tab.getDisplay(), 255, 255, 255));
 		currentTool = ToolType.Place;
 
-		BLACK = new Color(getDisplay(), 0, 0, 0);
-		GRAY = new Color(getDisplay(), 150, 150, 150);
+		BLACK = new Color(tab.getDisplay(), 0, 0, 0);
+		GRAY = new Color(tab.getDisplay(), 150, 150, 150);
+	}
+
+	public void updateSavedIndicators() {
+		if (document.hasUnsavedChanges()) {
+			tab.setText('*' + document.getFileName());
+		} else {
+			tab.setText(document.getFileName());
+		}
 	}
 
 	@Override
@@ -57,7 +84,7 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 		var context = event.gc;
 		context.setForeground(BLACK);
 		var file = DocumentManager.getCurrentDocument();
-		var size = getSize();
+		var size = canvas.getSize();
 		for (var rect : file.getRectangles()) {
 			int x = (int) Math.round(rect.x * size.x);
 			int y = (int) Math.round(rect.y * size.y);
@@ -110,7 +137,7 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 	public void mouseMove(MouseEvent event) {
 		currentMouseX = event.x;
 		currentMouseY = event.y;
-		redraw();
+		canvas.redraw();
 	}
 
 	@Override
@@ -130,7 +157,7 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 			case Select:
 				// Find the rectangle under the mouse, and select it. If no rectagle is
 				// under the mouse, clear the selection.
-				var size = getSize();
+				var size = canvas.getSize();
 				double mouseX = event.x / (double) size.x;
 				double mouseY = event.y / (double) size.y;
 				document.setSelectedRectangle(null);
@@ -144,14 +171,14 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 				}
 				break;
 		}
-		redraw();
+		canvas.redraw();
 	}
 
 	@Override
 	public void mouseUp(MouseEvent event) {
 		if (mouseIsDown) {
 			mouseIsDown = false;
-			var size = getSize();
+			var size = canvas.getSize();
 			double width = Math.abs(currentMouseX - mouseDownX) / (double) size.x;
 			double height = Math.abs(currentMouseY - mouseDownY) / (double) size.y;
 			double x = Math.min(currentMouseX, mouseDownX) / (double) size.x;
@@ -171,5 +198,18 @@ public class Editor extends Canvas implements PaintListener, MouseListener, Mous
 
 	public void setCurrentTool(ToolType currentTool) {
 		this.currentTool = currentTool;
+	}
+
+	public Document getDocument() {
+		return document;
+	}
+
+	public void dispose() {
+		tab.dispose();
+		canvas.dispose();
+	}
+
+	public TabItem getTabItem() {
+		return tab;
 	}
 }
