@@ -33,9 +33,12 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	private int mouseDownY;
 	private int currentMouseX;
 	private int currentMouseY;
+	private ToolType currentTool;
+
+	// TODO: Use an enum here.
+	private boolean movingRect;
 	private boolean makingNewRect;
 	private boolean resizingRect;
-	private ToolType currentTool;
 
 	private Document document;
 	private TabItem tab;
@@ -357,6 +360,22 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			// Don't change the cursor icon.
 			canvas.redraw();
 
+		} else if (movingRect) {
+			// Save the current mouse position.
+			currentMouseX = event.x;
+			currentMouseY = event.y;
+
+			var size = canvas.getSize();
+			double deltaX = (currentMouseX - mouseDownX) / (double) size.x;
+			double deltaY = (currentMouseY - mouseDownY) / (double) size.y;
+
+			double newX = selected.x + deltaX;
+			double newY = selected.y + deltaY;
+
+			document.setTempSize(newX, newY, selected.width, selected.height);
+
+			// Don't change the cursor icon.
+			canvas.redraw();
 		} else if (selected != null) {
 			boolean cursorSet = false;
 
@@ -400,6 +419,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 		// Selection handles ignore the current tool.
 		var selected = document.getSelectedRectangle();
 		if (selected != null) {
+			// Check the handles.
 			for (var handle : allHandles) {
 				if (handle.contains(event.x, event.y)) {
 					resizingRect = true;
@@ -408,6 +428,24 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 					currentMouseX = event.x;
 					currentMouseY = event.y;
 					heldHandle = handle;
+
+					// Start a resize event.
+					document.setTempSize(selected.x, selected.y, selected.width, selected.height);
+
+					// Skip the logic for the current tool.
+					return;
+				}
+			}
+
+			// Check the shape itself.
+			var size = canvas.getSize();
+			if (event.x > selected.x * size.x && event.x < (selected.x + selected.width) * size.x) {
+				if (event.y > selected.y * size.y && event.y < (selected.y + selected.height) * size.y) {
+					movingRect = true;
+					mouseDownX = event.x;
+					mouseDownY = event.y;
+					currentMouseX = event.x;
+					currentMouseY = event.y;
 
 					// Start a resize event.
 					document.setTempSize(selected.x, selected.y, selected.width, selected.height);
@@ -499,6 +537,19 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 
 			resizingRect = false;
 			heldHandle = null;
+		} else if (movingRect) {
+			var size = canvas.getSize();
+			double deltaX = (currentMouseX - mouseDownX) / (double) size.x;
+			double deltaY = (currentMouseY - mouseDownY) / (double) size.y;
+
+			var selected = document.getSelectedRectangle();
+			double newX = selected.x + deltaX;
+			double newY = selected.y + deltaY;
+
+			document.cancelTempSize();
+			document.getUndoStack().push(new ResizeRectangleAction(selected, newX, newY, selected.width, selected.height));
+
+			movingRect = false;
 		}
 	}
 
