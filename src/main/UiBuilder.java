@@ -36,7 +36,7 @@ public class UiBuilder {
 	private ToolType selectedTool;
 	private HashMap<Document, TabItem> documentsToTabs;
 	private HashMap<TabItem, Document> tabsToDocuments;
-	private HashSet<WeakReference<Preview>> previews;
+	private HashSet<WeakReference<Editor>> previews;
 
 	///////////////////////////
 	// Begin auto-generated fields
@@ -233,7 +233,7 @@ public class UiBuilder {
 		tab.setText(document.getFileName());
 		document.getUndoStack().addListener(action->updateSavedIndicators(document));
 
-		Preview preview = new Preview(documentTabs, document);
+		Editor preview = new Editor(documentTabs, document);
 		tab.setControl(preview);
 		preview.setCurrentTool(selectedTool);
 

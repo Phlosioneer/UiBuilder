@@ -11,7 +11,7 @@ import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
 import main.UiBuilder.ToolType;
 
-public class Preview extends Canvas implements PaintListener, MouseListener, MouseMoveListener {
+public class Editor extends Canvas implements PaintListener, MouseListener, MouseMoveListener {
 
 	// In pixels.
 	private static final int HANDLE_SIZE = 8;
@@ -29,7 +29,7 @@ public class Preview extends Canvas implements PaintListener, MouseListener, Mou
 
 	private Document document;
 
-	public Preview(Composite parent, Document document) {
+	public Editor(Composite parent, Document document) {
 		super(parent, SWT.NONE);
 		assert (document != null);
 		this.document = document;
