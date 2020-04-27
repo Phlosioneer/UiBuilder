@@ -34,19 +34,24 @@ public class Rectangle {
 	@Override
 	public String toString() {
 		if (name.isBlank()) {
-			var builder = new StringBuilder();
-			builder.append("(x:");
-			builder.append(Double.toString(x), 0, 5);
-			builder.append(", y:");
-			builder.append(Double.toString(y), 0, 5);
-			builder.append(", w:");
-			builder.append(Double.toString(width), 0, 5);
-			builder.append(", h:");
-			builder.append(Double.toString(height), 0, 5);
-			builder.append(')');
-			return builder.toString();
+			var ret = "(x:" + formatDecimal(x, 2);
+			ret += ", y:" + formatDecimal(y, 2);
+			ret += ", width:" + formatDecimal(width, 2);
+			ret += ", height:" + formatDecimal(height, 2);
+			ret += ")";
+			return ret;
 		} else {
 			return name;
 		}
+	}
+
+	// TODO: This might become slow for large lists of rectangles. It can be made faster.
+	private static String formatDecimal(double value, int places) {
+		int rounded = (int) Math.round(value * Math.pow(10, places));
+		String ret = Integer.toString(rounded);
+		while (ret.length() < places) {
+			ret = '0' + ret;
+		}
+		return "0." + ret;
 	}
 }
