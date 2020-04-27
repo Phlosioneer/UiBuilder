@@ -43,6 +43,12 @@ public class UiBuilder {
 	private MenuItem menuRedo;
 	private ObjectListTab objectTab;
 	private TabFolder documentTabs;
+	private MenuItem menuDeselect;
+	private MenuItem menuDelete;
+	private MenuItem menuSelect;
+	private MenuItem menuPlace;
+	private ToolItem toolbarPlace;
+	private ToolItem toolbarSelect;
 
 	public UiBuilder() {
 		selectedTool = ToolType.Place;
@@ -87,60 +93,84 @@ public class UiBuilder {
 		shlUibuilderUntitled = new Shell();
 		shlUibuilderUntitled.setMinimumSize(new Point(400, 400));
 		shlUibuilderUntitled.setSize(942, 516);
-		shlUibuilderUntitled.setText("UiBuilder - Untitled");
+		shlUibuilderUntitled.setText("UiBuilder");
 		shlUibuilderUntitled.setLayout(new FormLayout());
 
 		menuBar = new Menu(shlUibuilderUntitled, SWT.BAR);
 		shlUibuilderUntitled.setMenuBar(menuBar);
 
 		MenuItem mntmNewSubmenu = new MenuItem(menuBar, SWT.CASCADE);
-		mntmNewSubmenu.setText("File");
+		mntmNewSubmenu.setText("&File");
 
 		Menu menu_1 = new Menu(mntmNewSubmenu);
 		mntmNewSubmenu.setMenu(menu_1);
 
 		MenuItem menuNew = new MenuItem(menu_1, SWT.NONE);
-		menuNew.setText("New");
+		menuNew.setText("&New");
+		menuNew.setAccelerator(SWT.CONTROL | 'N');
 
 		MenuItem menuOpen = new MenuItem(menu_1, SWT.NONE);
-		menuOpen.setText("Open...");
+		menuOpen.setText("&Open...");
+		menuOpen.setAccelerator(SWT.CONTROL | 'O');
 
 		MenuItem menuSave = new MenuItem(menu_1, SWT.NONE);
-		menuSave.setText("Save");
+		menuSave.setText("&Save");
+		menuSave.setAccelerator(SWT.CONTROL | 'S');
 
 		MenuItem menuSaveAs = new MenuItem(menu_1, SWT.NONE);
-		menuSaveAs.setText("Save As...");
+		menuSaveAs.setText("Save &As...");
+		menuSaveAs.setAccelerator(SWT.CONTROL | SWT.SHIFT | 'S');
+
+		MenuItem menuClose = new MenuItem(menu_1, SWT.NONE);
+		menuClose.setText("&Close");
+		menuClose.setAccelerator(SWT.CONTROL | 'W');
+
+		MenuItem menuCloseAll = new MenuItem(menu_1, SWT.NONE);
+		menuCloseAll.setText("Close All");
+		menuCloseAll.setAccelerator(SWT.CONTROL | SWT.SHIFT | 'W');
 
 		new MenuItem(menu_1, SWT.SEPARATOR);
 
 		MenuItem menuExit = new MenuItem(menu_1, SWT.NONE);
-		menuExit.setText("Exit");
+		menuExit.setText("E&xit");
+		menuExit.setAccelerator(SWT.CONTROL | 'Q');
 
 		MenuItem mntmEdit = new MenuItem(menuBar, SWT.CASCADE);
-		mntmEdit.setText("Edit");
+		mntmEdit.setText("&Edit");
 
 		Menu menu_2 = new Menu(mntmEdit);
 		mntmEdit.setMenu(menu_2);
 
 		menuUndo = new MenuItem(menu_2, SWT.NONE);
-		menuUndo.setText("Undo");
+		menuUndo.setText("&Undo");
 		menuUndo.setAccelerator(SWT.CONTROL | 'Z');
 
 		menuRedo = new MenuItem(menu_2, SWT.NONE);
-		menuRedo.setText("Redo");
+		menuRedo.setText("&Redo");
 		menuRedo.setAccelerator(SWT.CONTROL | SWT.SHIFT | 'Z');
 
+		menuDeselect = new MenuItem(menu_2, SWT.NONE);
+		menuDeselect.setText("&Deselect");
+		menuDeselect.setAccelerator(SWT.CONTROL | 'D');
+
+		menuDelete = new MenuItem(menu_2, SWT.NONE);
+		menuDelete.setText("D&elete");
+		menuDelete.setAccelerator(SWT.DEL);
+
 		MenuItem mntmTools = new MenuItem(menuBar, SWT.CASCADE);
-		mntmTools.setText("Tools");
+		mntmTools.setText("&Tools");
 
 		Menu menu_3 = new Menu(mntmTools);
 		mntmTools.setMenu(menu_3);
 
-		MenuItem menuSelect = new MenuItem(menu_3, SWT.NONE);
-		menuSelect.setText("Select");
+		menuSelect = new MenuItem(menu_3, SWT.RADIO);
+		menuSelect.setText("&Select");
+		menuSelect.setAccelerator('S');
 
-		MenuItem menuPlace = new MenuItem(menu_3, SWT.NONE);
-		menuPlace.setText("Place");
+		menuPlace = new MenuItem(menu_3, SWT.RADIO);
+		menuPlace.setText("&Place");
+		menuPlace.setSelection(true);
+		menuPlace.setAccelerator('P');
 
 		Composite canvasContainer = new Composite(shlUibuilderUntitled, SWT.NONE);
 		GridLayout gl_canvasContainer = new GridLayout(1, false);
@@ -182,11 +212,12 @@ public class UiBuilder {
 		ToolBar toolBar = new ToolBar(canvasContainer, SWT.FLAT | SWT.RIGHT);
 		toolBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
 
-		ToolItem tltmSelect = new ToolItem(toolBar, SWT.PUSH);
-		tltmSelect.setText("Select");
+		toolbarSelect = new ToolItem(toolBar, SWT.RADIO);
+		toolbarSelect.setText("Select");
 
-		ToolItem tltmPlace = new ToolItem(toolBar, SWT.PUSH);
-		tltmPlace.setText("Place");
+		toolbarPlace = new ToolItem(toolBar, SWT.RADIO);
+		toolbarPlace.setSelection(true);
+		toolbarPlace.setText("Place");
 
 		documentTabs = new TabFolder(canvasContainer, SWT.NONE);
 		documentTabs.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
@@ -199,6 +230,8 @@ public class UiBuilder {
 		menuSave.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSave));
 		menuSaveAs.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSaveAs));
 		menuExit.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onExit));
+		menuClose.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onClose));
+		menuCloseAll.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onCloseAll));
 
 		menuUndo.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onUndo));
 		menuRedo.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onRedo));
@@ -206,22 +239,34 @@ public class UiBuilder {
 		var onSelect = SelectionListener.widgetSelectedAdapter(e->setSelectedTool(ToolType.Select));
 		var onPlace = SelectionListener.widgetSelectedAdapter(e->setSelectedTool(ToolType.Place));
 		menuSelect.addSelectionListener(onSelect);
-		tltmSelect.addSelectionListener(onSelect);
+		toolbarSelect.addSelectionListener(onSelect);
 		menuPlace.addSelectionListener(onPlace);
-		tltmPlace.addSelectionListener(onPlace);
+		toolbarPlace.addSelectionListener(onPlace);
 
 		DocumentManager.setShouldCloseDocument(this::closeWithoutSaving);
 
 		// Create a new tab whenever a document is created.
-		DocumentManager.addCreationListener(this::createTab);
-		DocumentManager.addCloseListener(this::destroyTab);
+		var creationListener = DocumentManager.addCreationListener(this::createTab);
+		var closeListener = DocumentManager.addCloseListener(this::destroyTab);
 
 		// Setup the first tab.
 		createTab(DocumentManager.getCurrentDocument());
 
 		// Keep the tab folder and the document manager in sync.
 		documentTabs.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onTabSelected));
-		DocumentManager.addSelectionListener(this::onDocumentSelected);
+		var selectionListener = DocumentManager.addSelectionListener(this::onDocumentSelected);
+
+		var docSelectionListener = DocumentManager.addCurrentDocumentSelectionListener(rect->updateCurrentDocumentMenus());
+		var docUndoListener = DocumentManager.addCurrentDocumentUndoActionListener(action->updateCurrentDocumentMenus());
+
+		// Cleanup listeners (though this shouldn't be necessary).
+		shlUibuilderUntitled.addDisposeListener(e-> {
+			DocumentManager.removeCreationListener(creationListener);
+			DocumentManager.removeCloseListener(closeListener);
+			DocumentManager.removeSelectionListener(selectionListener);
+			DocumentManager.removeCurrentDocumentListener(docSelectionListener);
+			DocumentManager.removeCurrentDocumentListener(docUndoListener);
+		});
 	}
 
 	private void createTab(Document document) {
@@ -237,6 +282,7 @@ public class UiBuilder {
 			if (tab.getDocument() == document) {
 				editors.remove(tab);
 				tab.dispose();
+				return;
 			}
 		}
 		throw new RuntimeException("Unable to find an editor for document:" + document);
@@ -247,14 +293,25 @@ public class UiBuilder {
 		var tab = documentTabs.getSelection()[0];
 		var editor = (Editor) tab.getData(Editor.TAB_ITEM_DATA_NAME);
 		DocumentManager.setCurrentDocument(editor.getDocument());
+		updateCurrentDocumentMenus();
 	}
 
 	private void onDocumentSelected(Document document) {
 		for (var editor : editors) {
 			if (editor.getDocument() == document) {
 				documentTabs.setSelection(editor.getTabItem());
+				break;
 			}
 		}
+		updateCurrentDocumentMenus();
+	}
+
+	private void updateCurrentDocumentMenus() {
+		var document = DocumentManager.getCurrentDocument();
+		menuUndo.setEnabled(document.getUndoStack().canUndo());
+		menuRedo.setEnabled(document.getUndoStack().canRedo());
+		menuDelete.setEnabled(document.getSelectedRectangle() != null);
+		menuDeselect.setEnabled(document.getSelectedRectangle() != null);
 	}
 
 	private void onNew(SelectionEvent e) {
@@ -308,7 +365,22 @@ public class UiBuilder {
 	}
 
 	private void setSelectedTool(ToolType newToolType) {
+		if (newToolType == selectedTool) {
+			return;
+		}
 		selectedTool = newToolType;
+		switch (selectedTool) {
+			case Select:
+				toolbarSelect.setSelection(true);
+				menuSelect.setSelection(true);
+				break;
+			case Place:
+				toolbarPlace.setSelection(true);
+				menuPlace.setSelection(true);
+				break;
+			default:
+				throw new RuntimeException();
+		}
 		for (var editor : editors) {
 			editor.setCurrentTool(selectedTool);
 		}
@@ -344,11 +416,5 @@ public class UiBuilder {
 		} else {
 			return true;
 		}
-	}
-
-	private void updateUndoMenus() {
-		var document = DocumentManager.getCurrentDocument();
-		menuUndo.setEnabled(document.getUndoStack().canUndo());
-		menuRedo.setEnabled(document.getUndoStack().canRedo());
 	}
 }

@@ -17,6 +17,8 @@ import java.util.function.Predicate;
 import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
+import actions.UndoAction;
+import main.Document.TemporaryResizeListener;
 
 public class DocumentManager {
 
@@ -32,6 +34,10 @@ public class DocumentManager {
 	private ArrayList<Consumer<Document>> saveListeners;
 	private Predicate<Document> shouldCloseDocument;
 
+	// Listeners that detach and re-attach themselves so that they're only listening
+	// to the current document.
+	private ArrayList<CurrentDocumentListener> currentDocListeners;
+
 	// We can't change the selected file while iterating through selectionListeners.
 	private boolean currentFileLock;
 
@@ -45,6 +51,8 @@ public class DocumentManager {
 		closeListeners = new ArrayList<>();
 		saveListeners = new ArrayList<>();
 		shouldCloseDocument = null;
+
+		currentDocListeners = new ArrayList<>();
 
 		currentFileLock = false;
 	}
@@ -292,7 +300,7 @@ public class DocumentManager {
 	}
 
 	private void notifySaveListeners(Document document) {
-		var listeners = new ArrayList<>(instance.saveListeners);
+		var listeners = new ArrayList<>(saveListeners);
 		for (var listener : listeners) {
 			listener.accept(document);
 		}
@@ -303,5 +311,103 @@ public class DocumentManager {
 	 */
 	public static void setShouldCloseDocument(Predicate<Document> predicate) {
 		instance.shouldCloseDocument = predicate;
+	}
+
+	public static CurrentDocumentListener addCurrentDocumentSelectionListener(Consumer<Rectangle> listener) {
+		var newListener = CurrentDocumentListener.selectionListener(listener);
+		instance.currentDocListeners.add(newListener);
+		return newListener;
+	}
+
+	public static CurrentDocumentListener addCurrentDocumentUndoActionListener(Consumer<UndoAction> listener) {
+		var newListener = CurrentDocumentListener.undoListener(listener);
+		instance.currentDocListeners.add(newListener);
+		return newListener;
+	}
+
+	public static CurrentDocumentListener addCurrentDocumentTemporaryResizeListener(TemporaryResizeListener listener) {
+		var newListener = CurrentDocumentListener.resizeListener(listener);
+		instance.currentDocListeners.add(newListener);
+		return newListener;
+	}
+
+	public static void removeCurrentDocumentListener(CurrentDocumentListener listener) {
+		instance.currentDocListeners.remove(listener);
+		listener.dispose();
+	}
+
+	public static class CurrentDocumentListener {
+		private Document attachedDocument;
+		private Object listener;
+		boolean isSelectionListener;
+		boolean isUndoListener;
+		boolean isResizeListener;
+		Consumer<Document> documentListener;
+
+		private CurrentDocumentListener(Document document, Object listener) {
+			isSelectionListener = false;
+			isUndoListener = false;
+			isResizeListener = false;
+			attachedDocument = document;
+			this.listener = listener;
+
+			documentListener = DocumentManager.addSelectionListener(newDocument-> {
+				detach();
+				attachedDocument = newDocument;
+				attach();
+			});
+		}
+
+		protected static CurrentDocumentListener selectionListener(Consumer<Rectangle> listener) {
+			var ret = new CurrentDocumentListener(getCurrentDocument(), listener);
+			ret.isSelectionListener = true;
+			ret.attach();
+			return ret;
+		}
+
+		protected static CurrentDocumentListener undoListener(Consumer<UndoAction> listener) {
+			var ret = new CurrentDocumentListener(getCurrentDocument(), listener);
+			ret.isUndoListener = true;
+			ret.attach();
+			return ret;
+		}
+
+		protected static CurrentDocumentListener resizeListener(TemporaryResizeListener listener) {
+			var ret = new CurrentDocumentListener(getCurrentDocument(), listener);
+			ret.isResizeListener = true;
+			ret.attach();
+			return ret;
+		}
+
+		@SuppressWarnings("unchecked")
+		private void attach() {
+			if (isSelectionListener) {
+				attachedDocument.addSelectionListener((Consumer<Rectangle>) listener);
+			}
+			if (isResizeListener) {
+				attachedDocument.addTemporaryResizeListener((TemporaryResizeListener) listener);
+			}
+			if (isUndoListener) {
+				attachedDocument.getUndoStack().addListener((Consumer<UndoAction>) listener);
+			}
+		}
+
+		@SuppressWarnings("unchecked")
+		private void detach() {
+			if (isSelectionListener) {
+				attachedDocument.removeSelectionListener((Consumer<Rectangle>) listener);
+			}
+			if (isResizeListener) {
+				attachedDocument.removeTemporaryResizeListener((TemporaryResizeListener) listener);
+			}
+			if (isUndoListener) {
+				attachedDocument.getUndoStack().removeListener((Consumer<UndoAction>) listener);
+			}
+		}
+
+		protected void dispose() {
+			detach();
+			DocumentManager.removeSelectionListener(documentListener);
+		}
 	}
 }
