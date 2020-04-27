@@ -2,7 +2,9 @@
 package main;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
+import java.util.HashSet;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -34,6 +36,7 @@ public class UiBuilder {
 	private ToolType selectedTool;
 	private HashMap<Document, TabItem> documentsToTabs;
 	private HashMap<TabItem, Document> tabsToDocuments;
+	private HashSet<WeakReference<Preview>> previews;
 
 	///////////////////////////
 	// Begin auto-generated fields
@@ -45,9 +48,10 @@ public class UiBuilder {
 	private TabFolder documentTabs;
 
 	public UiBuilder() {
-		selectedTool = ToolType.Select;
+		selectedTool = ToolType.Place;
 		documentsToTabs = new HashMap<>();
 		tabsToDocuments = new HashMap<>();
+		previews = new HashSet<>();
 	}
 
 	/**
@@ -181,10 +185,10 @@ public class UiBuilder {
 		ToolBar toolBar = new ToolBar(canvasContainer, SWT.FLAT | SWT.RIGHT);
 		toolBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
 
-		ToolItem tltmSelect = new ToolItem(toolBar, SWT.NONE);
+		ToolItem tltmSelect = new ToolItem(toolBar, SWT.PUSH);
 		tltmSelect.setText("Select");
 
-		ToolItem tltmPlace = new ToolItem(toolBar, SWT.NONE);
+		ToolItem tltmPlace = new ToolItem(toolBar, SWT.PUSH);
 		tltmPlace.setText("Place");
 
 		documentTabs = new TabFolder(canvasContainer, SWT.NONE);
@@ -202,8 +206,12 @@ public class UiBuilder {
 		menuUndo.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onUndo));
 		menuRedo.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onRedo));
 
-		menuSelect.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onSelectTool));
-		menuPlace.addSelectionListener(SelectionListener.widgetSelectedAdapter(this::onPlaceTool));
+		var onSelect = SelectionListener.widgetSelectedAdapter(e->setSelectedTool(ToolType.Select));
+		var onPlace = SelectionListener.widgetSelectedAdapter(e->setSelectedTool(ToolType.Place));
+		menuSelect.addSelectionListener(onSelect);
+		tltmSelect.addSelectionListener(onSelect);
+		menuPlace.addSelectionListener(onPlace);
+		tltmPlace.addSelectionListener(onPlace);
 
 		DocumentManager.setShouldCloseDocument(this::closeWithoutSaving);
 
@@ -227,9 +235,11 @@ public class UiBuilder {
 
 		Preview preview = new Preview(documentTabs, document);
 		tab.setControl(preview);
+		preview.setCurrentTool(selectedTool);
 
 		documentsToTabs.put(document, tab);
 		tabsToDocuments.put(tab, document);
+		previews.add(new WeakReference<>(preview));
 	}
 
 	private void destroyTab(Document document) {
@@ -238,6 +248,10 @@ public class UiBuilder {
 		tab.dispose();
 		documentsToTabs.remove(document);
 		tabsToDocuments.remove(tab);
+
+		// This is unlikely to remove the tab we just destroyed, but should cleanup
+		// after previous destroyed tabs.
+		previews.removeIf(ref->ref.get() != null);
 	}
 
 	private void onTabSelected(SelectionEvent e) {
@@ -303,12 +317,14 @@ public class UiBuilder {
 		DocumentManager.getCurrentDocument().getUndoStack().redo();
 	}
 
-	private void onSelectTool(SelectionEvent e) {
-		selectedTool = ToolType.Select;
-	}
-
-	private void onPlaceTool(SelectionEvent e) {
-		selectedTool = ToolType.Place;
+	private void setSelectedTool(ToolType newToolType) {
+		selectedTool = newToolType;
+		for (var previewRef : previews) {
+			var preview = previewRef.get();
+			if (preview != null) {
+				preview.setCurrentTool(newToolType);
+			}
+		}
 	}
 
 	private FileDialog makeDialog(int type) {
