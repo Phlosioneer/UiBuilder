@@ -168,12 +168,10 @@ public class UiBuilder {
 
 		menuSelect = new MenuItem(menu_3, SWT.RADIO);
 		menuSelect.setText("&Select");
-		menuSelect.setAccelerator('S');
 
 		menuPlace = new MenuItem(menu_3, SWT.RADIO);
 		menuPlace.setText("&Place");
 		menuPlace.setSelection(true);
-		menuPlace.setAccelerator('P');
 
 		Composite canvasContainer = new Composite(shlUibuilderUntitled, SWT.NONE);
 		GridLayout gl_canvasContainer = new GridLayout(1, false);
