@@ -276,7 +276,6 @@ public class ObjectInfoTab extends Composite implements TemporaryResizeListener 
 	}
 
 	private void commitChanges(Text changedField) {
-		System.out.println("commitChanges");
 		assert (currentlyModifiedDocument != null);
 		assert (currentlyModifiedRectangle != null);
 		if (!isDrivingResize) {
