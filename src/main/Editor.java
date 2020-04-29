@@ -372,6 +372,8 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			double newX = selected.x + deltaX;
 			double newY = selected.y + deltaY;
 
+			newX = round(newX);
+			newY = round(newY);
 			document.setTempSize(this, newX, newY, selected.width, selected.height);
 
 			// Don't change the cursor icon.
@@ -502,10 +504,10 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			double y = Math.min(currentMouseY, mouseDownY) / (double) size.y;
 
 			// Round to 3 decimal places.
-			width = Math.round(width * 1000) / 1000.0;
-			height = Math.round(height * 1000) / 1000.0;
-			x = Math.round(x * 1000) / 1000.0;
-			y = Math.round(y * 1000) / 1000.0;
+			width = round(width);
+			height = round(height);
+			x = round(x);
+			y = round(y);
 
 			DocumentManager.getCurrentDocument().addRectangle(new main.Rectangle(x, y, width, height));
 		} else if (resizingRect) {
@@ -524,12 +526,10 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			newWidth = Math.abs(newWidth);
 			newHeight = Math.abs(newHeight);
 
-			// Round to 3 decimal places.
-			newX = Math.round(newX * 1000) / 1000.0;
-			newY = Math.round(newY * 1000) / 1000.0;
-			newWidth = Math.round(newWidth * 1000) / 1000.0;
-			newHeight = Math.round(newHeight * 1000) / 1000.0;
-
+			newX = round(newX);
+			newY = round(newY);
+			newWidth = round(newWidth);
+			newHeight = round(newHeight);
 			document.cancelTempSize(this);
 
 			var selected = document.getSelectedRectangle();
@@ -546,6 +546,8 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			double newX = selected.x + deltaX;
 			double newY = selected.y + deltaY;
 
+			newX = round(newX);
+			newY = round(newY);
 			document.cancelTempSize(this);
 			document.getUndoStack().push(new ResizeRectangleAction(selected, newX, newY, selected.width, selected.height));
 
@@ -598,6 +600,11 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			height += deltaY;
 		}
 
+		// Round.
+		x = round(x);
+		y = round(y);
+		width = round(width);
+		height = round(height);
 		document.setTempSize(this, x, y, width, height);
 	}
 
@@ -633,5 +640,9 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	@Override
 	public void resizeCancelled(Object source) {
 		canvas.redraw();
+	}
+
+	private static double round(double value) {
+		return Math.round(value * 1000) / 1000.0;
 	}
 }
