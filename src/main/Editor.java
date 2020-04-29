@@ -184,6 +184,16 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			int scaledY = (int) Math.round(rectY * size.y);
 			int scaledWidth = (int) Math.round(rectWidth * size.x);
 			int scaledHeight = (int) Math.round(rectHeight * size.y);
+
+			// Manual correction: if the left or bottom edges are on the first
+			// pixel after the canvas ends, push them back onto the canvas.
+			if (scaledX + scaledWidth == size.x) {
+				scaledWidth -= 1;
+			}
+			if (scaledY + scaledHeight == size.y) {
+				scaledHeight -= 1;
+			}
+
 			context.drawRectangle(scaledX, scaledY, scaledWidth, scaledHeight);
 		}
 
