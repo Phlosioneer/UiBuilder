@@ -306,6 +306,10 @@ public class Document {
 		return isInResizeMode;
 	}
 
+	public void setHasUnsavedChanges(boolean value) {
+		hasUnsavedChanges = value;
+	}
+
 	public static interface TemporaryResizeListener {
 		void resizeStarted(Object source);
 
@@ -368,4 +372,5 @@ public class Document {
 			parent.removeRectangle(rectangle, false);
 		}
 	}
+
 }

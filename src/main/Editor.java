@@ -77,7 +77,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 		tab.setText(document.getFileName());
 		document.getUndoStack().addListener(action->updateSavedIndicators());
 
-		canvas = new Canvas(parent, SWT.NONE);
+		canvas = new Canvas(parent, SWT.BORDER);
 		tab.setControl(canvas);
 
 		var actionListener = document.getUndoStack().addListener(action->canvas.redraw());

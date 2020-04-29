@@ -229,6 +229,7 @@ public class DocumentManager {
 		}
 
 		// Saved successfully.
+		document.setHasUnsavedChanges(false);
 		instance.notifySaveListeners(document);
 	}
 

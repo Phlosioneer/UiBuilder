@@ -330,6 +330,9 @@ public class UiBuilder {
 	private void onSave(SelectionEvent e) {
 		if (DocumentManager.getCurrentDocument().getFilePath() == null) {
 			onSaveAs(e);
+			if (DocumentManager.getCurrentDocument().getFilePath() == null) {
+				return;
+			}
 		}
 		DocumentManager.saveDocument(DocumentManager.getCurrentDocument());
 	}
