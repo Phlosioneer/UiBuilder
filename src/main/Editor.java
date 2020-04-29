@@ -372,7 +372,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			double newX = selected.x + deltaX;
 			double newY = selected.y + deltaY;
 
-			document.setTempSize(newX, newY, selected.width, selected.height);
+			document.setTempSize(this, newX, newY, selected.width, selected.height);
 
 			// Don't change the cursor icon.
 			canvas.redraw();
@@ -430,7 +430,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 					heldHandle = handle;
 
 					// Start a resize event.
-					document.setTempSize(selected.x, selected.y, selected.width, selected.height);
+					document.setTempSize(this, selected.x, selected.y, selected.width, selected.height);
 
 					// Skip the logic for the current tool.
 					return;
@@ -448,7 +448,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 					currentMouseY = event.y;
 
 					// Start a resize event.
-					document.setTempSize(selected.x, selected.y, selected.width, selected.height);
+					document.setTempSize(this, selected.x, selected.y, selected.width, selected.height);
 
 					// Skip the logic for the current tool.
 					return;
@@ -530,7 +530,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			newWidth = Math.round(newWidth * 1000) / 1000.0;
 			newHeight = Math.round(newHeight * 1000) / 1000.0;
 
-			document.cancelTempSize();
+			document.cancelTempSize(this);
 
 			var selected = document.getSelectedRectangle();
 			document.getUndoStack().push(new ResizeRectangleAction(selected, newX, newY, newWidth, newHeight));
@@ -546,7 +546,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			double newX = selected.x + deltaX;
 			double newY = selected.y + deltaY;
 
-			document.cancelTempSize();
+			document.cancelTempSize(this);
 			document.getUndoStack().push(new ResizeRectangleAction(selected, newX, newY, selected.width, selected.height));
 
 			movingRect = false;
@@ -598,7 +598,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 			height += deltaY;
 		}
 
-		document.setTempSize(x, y, width, height);
+		document.setTempSize(this, x, y, width, height);
 	}
 
 	public ToolType getCurrentTool() {
@@ -623,7 +623,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	}
 
 	@Override
-	public void resizeStarted() {}
+	public void resizeStarted(Object source) {}
 
 	@Override
 	public void resize(double x, double y, double width, double height) {
@@ -631,7 +631,7 @@ public class Editor implements PaintListener, MouseListener, MouseMoveListener, 
 	}
 
 	@Override
-	public void resizeCancelled() {
+	public void resizeCancelled(Object source) {
 		canvas.redraw();
 	}
 }

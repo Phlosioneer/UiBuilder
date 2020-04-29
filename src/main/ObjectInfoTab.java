@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.FocusListener;
+import org.eclipse.swt.events.KeyEvent;
+import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
@@ -13,8 +15,9 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
 import actions.RenameRectangleAction;
 import actions.ResizeRectangleAction;
+import main.Document.TemporaryResizeListener;
 
-public class ObjectInfoTab extends Composite {
+public class ObjectInfoTab extends Composite implements TemporaryResizeListener {
 	private Text textName;
 	private Text textX;
 	private Text textY;
@@ -23,7 +26,7 @@ public class ObjectInfoTab extends Composite {
 
 	private Document currentlyModifiedDocument;
 	private Rectangle currentlyModifiedRectangle;
-	private Text focusedTextField;
+	private boolean isDrivingResize;
 
 	private ArrayList<Text> textFields;
 
@@ -42,6 +45,7 @@ public class ObjectInfoTab extends Composite {
 		textName = new Text(this, SWT.BORDER);
 		textName.addFocusListener(FocusListener.focusLostAdapter(this::fieldLostFocus));
 		textName.addFocusListener(FocusListener.focusGainedAdapter(this::fieldGainedFocus));
+		textName.addKeyListener(KeyListener.keyPressedAdapter(this::fieldKeyPressed));
 		FormData fd_textName = new FormData();
 		fd_textName.top = new FormAttachment(0, 10);
 		fd_textName.left = new FormAttachment(0, 71);
@@ -52,6 +56,7 @@ public class ObjectInfoTab extends Composite {
 		textX.addVerifyListener(this::verifyNumber);
 		textX.addFocusListener(FocusListener.focusLostAdapter(this::fieldLostFocus));
 		textX.addFocusListener(FocusListener.focusGainedAdapter(this::fieldGainedFocus));
+		textX.addKeyListener(KeyListener.keyPressedAdapter(this::fieldKeyPressed));
 		FormData fd_textX = new FormData();
 		fd_textX.top = new FormAttachment(textName, 6);
 		fd_textX.left = new FormAttachment(textName, 0, SWT.LEFT);
@@ -62,6 +67,7 @@ public class ObjectInfoTab extends Composite {
 		textY.addVerifyListener(this::verifyNumber);
 		textY.addFocusListener(FocusListener.focusLostAdapter(this::fieldLostFocus));
 		textY.addFocusListener(FocusListener.focusGainedAdapter(this::fieldGainedFocus));
+		textY.addKeyListener(KeyListener.keyPressedAdapter(this::fieldKeyPressed));
 		FormData fd_textY = new FormData();
 		fd_textY.top = new FormAttachment(textX, 6);
 		fd_textY.left = new FormAttachment(textX, 0, SWT.LEFT);
@@ -72,6 +78,7 @@ public class ObjectInfoTab extends Composite {
 		textWidth.addVerifyListener(this::verifyNumber);
 		textWidth.addFocusListener(FocusListener.focusLostAdapter(this::fieldLostFocus));
 		textWidth.addFocusListener(FocusListener.focusGainedAdapter(this::fieldGainedFocus));
+		textWidth.addKeyListener(KeyListener.keyPressedAdapter(this::fieldKeyPressed));
 		FormData fd_textWidth = new FormData();
 		fd_textWidth.top = new FormAttachment(textY, 6);
 		fd_textWidth.left = new FormAttachment(textY, 0, SWT.LEFT);
@@ -82,6 +89,7 @@ public class ObjectInfoTab extends Composite {
 		textHeight.addVerifyListener(this::verifyNumber);
 		textHeight.addFocusListener(FocusListener.focusLostAdapter(this::fieldLostFocus));
 		textHeight.addFocusListener(FocusListener.focusGainedAdapter(this::fieldGainedFocus));
+		textHeight.addKeyListener(KeyListener.keyPressedAdapter(this::fieldKeyPressed));
 		FormData fd_textHeight = new FormData();
 		fd_textHeight.top = new FormAttachment(textWidth, 6);
 		fd_textHeight.left = new FormAttachment(textWidth, 0, SWT.LEFT);
@@ -126,6 +134,8 @@ public class ObjectInfoTab extends Composite {
 		/////////////////////////////////////////////////////
 		// End generated code
 
+		isDrivingResize = false;
+
 		textFields = new ArrayList<>(5);
 		textFields.add(textName);
 		textFields.add(textX);
@@ -139,11 +149,15 @@ public class ObjectInfoTab extends Composite {
 
 		var selectionListener = DocumentManager.addCurrentDocumentSelectionListener(this::selectedRectChanged);
 		var documentChangeListener = DocumentManager.addSelectionListener(newDocument->selectedRectChanged(newDocument.getSelectedRectangle()));
+		var tempResizeListener = DocumentManager.addCurrentDocumentTemporaryResizeListener(this);
+		var actionListener = DocumentManager.addCurrentDocumentUndoActionListener(action->populate());
 
 		// Clean up listeners.
 		addDisposeListener(e-> {
 			DocumentManager.removeCurrentDocumentListener(selectionListener);
 			DocumentManager.removeSelectionListener(documentChangeListener);
+			DocumentManager.removeCurrentDocumentListener(tempResizeListener);
+			DocumentManager.removeCurrentDocumentListener(actionListener);
 		});
 	}
 
@@ -172,38 +186,51 @@ public class ObjectInfoTab extends Composite {
 		}
 
 		// Successful change. Set the value as temporary until the user finishes editing.
-		var document = DocumentManager.getCurrentDocument();
-		var rect = document.getSelectedRectangle();
-		var x = rect.x;
-		var y = rect.y;
-		var width = rect.width;
-		var height = rect.height;
-		if (textField == textX) {
-			x = value;
-		} else if (textField == textY) {
-			y = value;
-		} else if (textField == textWidth) {
-			width = value;
-		} else {
-			assert (textField == textHeight);
-			height = value;
-		}
+		var resizeSource = DocumentManager.getCurrentDocument().getResizeSource();
 
-		document.setTempSize(x, y, width, height);
+		if ((resizeSource == null || resizeSource == this) && currentlyModifiedDocument != null) {
+			var x = currentlyModifiedRectangle.x;
+			var y = currentlyModifiedRectangle.y;
+			var width = currentlyModifiedRectangle.width;
+			var height = currentlyModifiedRectangle.height;
+			if (textField == textX) {
+				x = value;
+			} else if (textField == textY) {
+				y = value;
+			} else if (textField == textWidth) {
+				width = value;
+			} else {
+				assert (textField == textHeight);
+				height = value;
+			}
+			currentlyModifiedDocument.setTempSize(this, x, y, width, height);
+			isDrivingResize = true;
+		}
 	}
 
 	private void fieldLostFocus(FocusEvent event) {
-		commitChanges((Text) event.widget);
+		if (currentlyModifiedDocument != null) {
+			commitChanges((Text) event.widget);
+		}
 		currentlyModifiedDocument = null;
 		currentlyModifiedRectangle = null;
 		populate();
 	}
 
 	private void fieldGainedFocus(FocusEvent event) {
+		assert (currentlyModifiedDocument == null);
+		assert (currentlyModifiedRectangle == null);
 		currentlyModifiedDocument = DocumentManager.getCurrentDocument();
 		currentlyModifiedRectangle = currentlyModifiedDocument.getSelectedRectangle();
 		assert (currentlyModifiedRectangle != null);
-		focusedTextField = (Text) event.widget;
+	}
+
+	private void fieldKeyPressed(KeyEvent event) {
+		if (event.character == '\n') {
+			commitChanges((Text) event.widget);
+		} else if (event.keyCode == SWT.ESC) {
+			cancelChanges();
+		}
 	}
 
 	private void selectedRectChanged(Rectangle newSelection) {
@@ -218,7 +245,8 @@ public class ObjectInfoTab extends Composite {
 	}
 
 	private void populate() {
-		var rect = DocumentManager.getCurrentDocument().getSelectedRectangle();
+		var document = DocumentManager.getCurrentDocument();
+		var rect = document.getSelectedRectangle();
 		if (rect == null) {
 			for (var field : textFields) {
 				field.setText("");
@@ -228,18 +256,35 @@ public class ObjectInfoTab extends Composite {
 			for (var field : textFields) {
 				field.setEnabled(true);
 			}
+			double x = rect.x;
+			double y = rect.y;
+			double width = rect.width;
+			double height = rect.height;
+			if (document.hasTempResize()) {
+				x = document.getTempX();
+				y = document.getTempY();
+				width = document.getTempWidth();
+				height = document.getTempHeight();
+			}
+
 			textName.setText(rect.name);
-			textX.setText(Double.toString(rect.x));
-			textY.setText(Double.toString(rect.y));
-			textWidth.setText(Double.toString(rect.width));
-			textHeight.setText(Double.toString(rect.height));
+			textX.setText(Double.toString(x));
+			textY.setText(Double.toString(y));
+			textWidth.setText(Double.toString(width));
+			textHeight.setText(Double.toString(height));
 		}
 	}
 
 	private void commitChanges(Text changedField) {
+		System.out.println("commitChanges");
 		assert (currentlyModifiedDocument != null);
 		assert (currentlyModifiedRectangle != null);
-		currentlyModifiedDocument.cancelTempSize();
+		if (!isDrivingResize) {
+			// Text wasn't modified.
+			return;
+		}
+		currentlyModifiedDocument.cancelTempSize(this);
+		isDrivingResize = false;
 
 		if (changedField == textName) {
 			currentlyModifiedDocument.getUndoStack().push(new RenameRectangleAction(currentlyModifiedRectangle, changedField.getText()));
@@ -275,8 +320,49 @@ public class ObjectInfoTab extends Composite {
 		currentlyModifiedDocument.getUndoStack().push(new ResizeRectangleAction(currentlyModifiedRectangle, x, y, width, height));
 	}
 
+	private void cancelChanges() {
+		assert (currentlyModifiedDocument != null);
+		assert (currentlyModifiedRectangle != null);
+
+		isDrivingResize = false;
+		currentlyModifiedDocument.cancelTempSize(this);
+		currentlyModifiedDocument = null;
+		currentlyModifiedRectangle = null;
+
+		for (var field : textFields) {
+			if (field.isFocusControl()) {
+				forceFocus();
+				break;
+			}
+		}
+
+		populate();
+	}
+
 	@Override
 	protected void checkSubclass() {
 		// Disable the check that prevents subclassing of SWT components
+	}
+
+	@Override
+	public void resizeStarted(Object source) {
+		if (isDrivingResize && source != this) {
+			cancelChanges();
+		}
+	}
+
+	@Override
+	public void resize(double x, double y, double width, double height) {
+		// Update only if we're not driving it.
+		if (currentlyModifiedRectangle == null) {
+			populate();
+		}
+	}
+
+	@Override
+	public void resizeCancelled(Object source) {
+		if (source != this) {
+			populate();
+		}
 	}
 }

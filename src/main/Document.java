@@ -38,6 +38,8 @@ public class Document {
 	private ArrayList<Consumer<Rectangle>> selectionListeners;
 	private int selectionListenersSemaphore;
 
+	private Object resizeSource;
+
 	private Document(ArrayList<Rectangle> rectangles) {
 		this.rectangles = rectangles;
 		rectanglesView = Collections.unmodifiableList(rectangles);
@@ -46,6 +48,7 @@ public class Document {
 		filename = "Untitled";
 		undoStack = new UndoStack(new UndoActionView(this));
 		hasUnsavedChanges = false;
+		resizeSource = null;
 
 		tempX = 0;
 		tempY = 0;
@@ -169,7 +172,13 @@ public class Document {
 		return currentSelection;
 	}
 
-	public void setTempSize(double x, double y, double width, double height) {
+	public void setTempSize(Object source, double x, double y, double width, double height) {
+		assert (source != null);
+		if (resizeSource != null) {
+			cancelTempSize(resizeSource);
+		}
+		resizeSource = source;
+
 		tempX = x;
 		tempY = y;
 		tempWidth = width;
@@ -180,7 +189,7 @@ public class Document {
 			isInResizeMode = true;
 
 			for (var listener : listeners) {
-				listener.resizeStarted();
+				listener.resizeStarted(source);
 			}
 		}
 
@@ -189,7 +198,12 @@ public class Document {
 		}
 	}
 
-	public void cancelTempSize() {
+	public void cancelTempSize(Object source) {
+		assert (source != null);
+		if (source != resizeSource) {
+			// Ignore it.
+			return;
+		}
 		tempX = 0;
 		tempY = 0;
 		tempWidth = 0;
@@ -198,8 +212,13 @@ public class Document {
 
 		var listeners = new ArrayList<>(tempResizeListeners);
 		for (var listener : listeners) {
-			listener.resizeCancelled();
+			listener.resizeCancelled(source);
 		}
+		resizeSource = null;
+	}
+
+	public Object getResizeSource() {
+		return resizeSource;
 	}
 
 	public void setPosition(Rectangle original, int newIndex) {
@@ -288,11 +307,11 @@ public class Document {
 	}
 
 	public static interface TemporaryResizeListener {
-		void resizeStarted();
+		void resizeStarted(Object source);
 
 		void resize(double x, double y, double width, double height);
 
-		void resizeCancelled();
+		void resizeCancelled(Object source);
 	}
 
 	public static class DocumentTypeAdapter extends TypeAdapter<Document> {
